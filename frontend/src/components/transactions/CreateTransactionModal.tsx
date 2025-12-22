@@ -1,0 +1,337 @@
+import { useState } from "react";
+import {
+  ArrowUpCircle,
+  ArrowDownCircle,
+  ShoppingCart,
+  Utensils,
+  Car,
+  Zap,
+  Home,
+  Heart,
+  Film,
+  ShoppingBag,
+  RefreshCw,
+  Gamepad2,
+  Plane,
+  GraduationCap,
+  Dumbbell,
+  User,
+  Gift,
+  TrendingUp,
+  ArrowLeftRight,
+  MoreHorizontal,
+} from "lucide-react";
+import { BottomSheet, Button, Input } from "../ui";
+import { transactions as transactionsApi } from "../../api/client";
+import type {
+  Account,
+  Transaction,
+  TransactionType,
+  TransactionCategory,
+  CreateTransactionRequest,
+} from "../../types";
+import { CATEGORIES, CURRENCIES } from "../../types";
+
+interface CreateTransactionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  account: Account;
+  onCreated: (transaction: Transaction) => void;
+}
+
+const categoryIcons: Record<TransactionCategory, React.ElementType> = {
+  groceries: ShoppingCart,
+  dining: Utensils,
+  transport: Car,
+  utilities: Zap,
+  rent: Home,
+  healthcare: Heart,
+  entertainment: Film,
+  shopping: ShoppingBag,
+  subscriptions: RefreshCw,
+  games: Gamepad2,
+  travel: Plane,
+  education: GraduationCap,
+  fitness: Dumbbell,
+  personal: User,
+  gifts: Gift,
+  income: TrendingUp,
+  transfer: ArrowLeftRight,
+  other: MoreHorizontal,
+};
+
+export function CreateTransactionModal({
+  isOpen,
+  onClose,
+  account,
+  onCreated,
+}: CreateTransactionModalProps) {
+  const [transactionType, setTransactionType] =
+    useState<TransactionType | null>(null);
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<TransactionCategory>("other");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currency = CURRENCIES.find((c) => c.code === account.currency);
+  const symbol = currency?.symbol || "$";
+
+  // Determine available transaction types based on account type
+  const getAvailableTypes = (): {
+    type: TransactionType;
+    label: string;
+    icon: React.ElementType;
+  }[] => {
+    switch (account.type) {
+      case "cash":
+      case "debit":
+      case "saving":
+      case "investment":
+        return [
+          { type: "deposit", label: "Deposit", icon: ArrowUpCircle },
+          { type: "withdrawal", label: "Withdrawal", icon: ArrowDownCircle },
+        ];
+      case "credit_card":
+        return [
+          { type: "expense", label: "Expense", icon: ArrowDownCircle },
+          { type: "payment", label: "Payment", icon: ArrowUpCircle },
+        ];
+      case "loan":
+        return [{ type: "payment", label: "Payment", icon: ArrowUpCircle }];
+      default:
+        return [];
+    }
+  };
+
+  const availableTypes = getAvailableTypes();
+
+  const resetForm = () => {
+    setTransactionType(null);
+    setAmount("");
+    setDescription("");
+    setCategory("other");
+    setError(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const getPreviewBalance = () => {
+    if (!amount || !transactionType) return null;
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum)) return null;
+
+    let currentBalance: number;
+    switch (account.type) {
+      case "credit_card":
+        currentBalance = account.credit_owed || 0;
+        break;
+      case "loan":
+        currentBalance = account.loan_current_owed || 0;
+        break;
+      default:
+        currentBalance = account.current_balance;
+    }
+
+    switch (transactionType) {
+      case "deposit":
+        return currentBalance + amountNum;
+      case "withdrawal":
+        return currentBalance - amountNum;
+      case "expense":
+        return currentBalance + amountNum; // Credit owed increases
+      case "payment":
+        return currentBalance - amountNum; // Owed decreases
+      default:
+        return currentBalance;
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!transactionType || !amount) return;
+
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const data: CreateTransactionRequest = {
+        type: transactionType,
+        amount: amountNum,
+        description,
+        category,
+      };
+
+      const transaction = await transactionsApi.create(account.id, data);
+      onCreated(transaction);
+      handleClose();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create transaction"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const previewBalance = getPreviewBalance();
+
+  return (
+    <BottomSheet isOpen={isOpen} onClose={handleClose} title="Add Transaction">
+      <div className="space-y-6">
+        {/* Transaction Type Toggle */}
+        <div className="flex gap-2">
+          {availableTypes.map(({ type, label, icon: Icon }) => (
+            <button
+              key={type}
+              onClick={() => setTransactionType(type)}
+              className={`
+                flex-1 p-4 rounded-xl border-2 transition-all
+                ${
+                  transactionType === type
+                    ? type === "deposit" || type === "payment"
+                      ? "border-success bg-success/10"
+                      : "border-danger bg-danger/10"
+                    : "border-border hover:border-quaternary/30"
+                }
+              `}
+            >
+              <Icon
+                className={`w-6 h-6 mx-auto mb-2 ${
+                  transactionType === type
+                    ? type === "deposit" || type === "payment"
+                      ? "text-success"
+                      : "text-danger"
+                    : "text-quaternary/50"
+                }`}
+              />
+              <p
+                className={`text-sm font-medium ${
+                  transactionType === type
+                    ? "text-quaternary"
+                    : "text-quaternary/60"
+                }`}
+              >
+                {label}
+              </p>
+            </button>
+          ))}
+        </div>
+
+        {/* Amount Input */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-quaternary/80">
+            Amount
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-quaternary/50">
+              {symbol}
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full pl-12 pr-4 py-4 text-2xl font-semibold rounded-xl bg-card border border-border text-quaternary focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+            />
+          </div>
+          {previewBalance !== null && (
+            <p className="text-sm text-quaternary/50">
+              New balance:{" "}
+              <span
+                className={`font-medium ${
+                  transactionType === "deposit" || transactionType === "payment"
+                    ? "text-success"
+                    : "text-danger"
+                }`}
+              >
+                {symbol}
+                {previewBalance.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </p>
+          )}
+        </div>
+
+        {/* Category Selector */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-quaternary/80">
+            Category
+          </label>
+          <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto py-1">
+            {(Object.keys(CATEGORIES) as TransactionCategory[]).map((cat) => {
+              const Icon = categoryIcons[cat];
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`
+                    p-2 rounded-xl transition-all flex flex-col items-center gap-1
+                    ${
+                      category === cat
+                        ? "bg-primary/20 border-2 border-primary"
+                        : "bg-card border border-border hover:border-quaternary/30"
+                    }
+                  `}
+                >
+                  <Icon
+                    className={`w-5 h-5 ${
+                      category === cat ? "text-primary" : "text-quaternary/60"
+                    }`}
+                  />
+                  <span
+                    className={`text-[10px] ${
+                      category === cat
+                        ? "text-primary font-medium"
+                        : "text-quaternary/50"
+                    }`}
+                  >
+                    {CATEGORIES[cat].label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Description */}
+        <Input
+          label="Description (optional)"
+          placeholder="e.g., Grocery shopping at Costco"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+
+        {/* Error */}
+        {error && (
+          <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <Button
+          onClick={handleSubmit}
+          isLoading={isLoading}
+          disabled={!transactionType || !amount}
+          className="w-full"
+          size="lg"
+        >
+          Add Transaction
+        </Button>
+      </div>
+    </BottomSheet>
+  );
+}
