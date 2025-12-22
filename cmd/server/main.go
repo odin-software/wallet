@@ -17,7 +17,7 @@ func main() {
 	// Get configuration from environment
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "7009"
 	}
 
 	dbPath := os.Getenv("DB_PATH")

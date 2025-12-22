@@ -44,7 +44,7 @@ npm install
 npm run dev
 ```
 
-- Backend runs on `http://localhost:8080`
+- Backend runs on `http://localhost:7009`
 - Frontend dev server runs on `http://localhost:5173` (proxies API requests to backend)
 
 ## Production Deployment (Docker)
@@ -58,13 +58,13 @@ docker pull ghcr.io/kengru/odin-wallet:latest
 # Run with persistent data volume
 docker run -d \
   --name odin-wallet \
-  -p 8080:8080 \
+  -p 7009:7009 \
   -v $(pwd)/wallet-data:/app/data \
   -e SESSION_SECRET=your-secure-secret-here \
   ghcr.io/kengru/odin-wallet:latest
 ```
 
-Access the application at `http://localhost:8080`
+Access the application at `http://localhost:7009`
 
 ### Build from Source
 
@@ -75,7 +75,7 @@ docker build -t odin-wallet .
 # Run the container
 docker run -d \
   --name odin-wallet \
-  -p 8080:8080 \
+  -p 7009:7009 \
   -v $(pwd)/wallet-data:/app/data \
   -e SESSION_SECRET=your-secure-secret-here \
   odin-wallet
@@ -85,7 +85,7 @@ docker run -d \
 
 | Variable         | Description                                             | Default                           |
 | ---------------- | ------------------------------------------------------- | --------------------------------- |
-| `PORT`           | Server port                                             | `8080`                            |
+| `PORT`           | Server port                                             | `7009`                            |
 | `SESSION_SECRET` | Secret key for session cookies (required in production) | `dev-secret-change-in-production` |
 | `DB_PATH`        | Path to SQLite database file                            | `./data/wallet.db`                |
 
