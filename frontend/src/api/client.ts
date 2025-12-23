@@ -9,6 +9,8 @@ import type {
   FinancialOverview,
   ExchangeRates,
   UpdatePreferencesRequest,
+  ReportResponse,
+  ReportPeriod,
 } from "../types";
 
 const API_BASE = "/api";
@@ -139,6 +141,18 @@ export const exchangeRates = {
     rate: number;
   }> =>
     request(`/exchange-rates/convert?from=${from}&to=${to}&amount=${amount}`),
+};
+
+// Reports API
+export const reports = {
+  get: (
+    period: ReportPeriod = "month",
+    date?: string
+  ): Promise<ReportResponse> => {
+    const params = new URLSearchParams({ period });
+    if (date) params.append("date", date);
+    return request(`/reports?${params.toString()}`);
+  },
 };
 
 export { ApiError };

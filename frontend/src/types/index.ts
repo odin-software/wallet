@@ -138,6 +138,19 @@ export interface ExchangeRates {
   updated_at: string;
 }
 
+// Reports
+export type ReportPeriod = "month" | "week";
+
+export interface ReportResponse {
+  period_start: string;
+  period_end: string;
+  currency: string;
+  total_income: number;
+  total_expenses: number;
+  expenses_by_category: Record<string, number>;
+  first_transaction_date: string | null;
+}
+
 // Category metadata
 export const CATEGORIES: Record<
   TransactionCategory,

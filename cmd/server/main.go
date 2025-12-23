@@ -52,6 +52,7 @@ func main() {
 	accountHandler := handlers.NewAccountHandler(db, exchangeService)
 	transactionHandler := handlers.NewTransactionHandler(db)
 	exchangeHandler := handlers.NewExchangeHandler(exchangeService)
+	reportHandler := handlers.NewReportHandler(db, exchangeService)
 
 	// Create router
 	r := chi.NewRouter()
@@ -100,6 +101,9 @@ func main() {
 			// Exchange rates
 			r.Get("/exchange-rates", exchangeHandler.GetRates)
 			r.Get("/exchange-rates/convert", exchangeHandler.Convert)
+
+			// Reports
+			r.Get("/reports", reportHandler.GetReport)
 		})
 	})
 

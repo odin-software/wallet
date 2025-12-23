@@ -6,6 +6,7 @@ import { Register } from "./pages/Register";
 import { Dashboard } from "./pages/Dashboard";
 import { AccountDetail } from "./pages/AccountDetail";
 import { Settings } from "./pages/Settings";
+import { Reports } from "./pages/Reports";
 import { motion } from "framer-motion";
 
 // Protected Route wrapper
@@ -97,6 +98,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Settings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <Reports />
           </ProtectedRoute>
         }
       />

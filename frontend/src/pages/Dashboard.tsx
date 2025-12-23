@@ -8,6 +8,7 @@ import {
   Wallet,
   LogOut,
   Settings,
+  PieChart,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -114,6 +115,14 @@ export function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/reports")}
+            >
+              <PieChart className="w-4 h-4" />
+              <span className="hidden sm:inline">Reports</span>
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -347,7 +356,7 @@ export function Dashboard() {
                         </div>
                       </div>
                       <p
-                        className={`font-semibold ${
+                        className={`font-semibold whitespace-nowrap ${
                           isPositive ? "text-success" : "text-danger"
                         }`}
                       >
