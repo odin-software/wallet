@@ -112,8 +112,70 @@ export function Dashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
+        {/* Accounts */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-quaternary">Accounts</h2>
+            <Button
+              size="sm"
+              onClick={() => setShowCreateAccountModal(true)}
+              icon={<Plus className="w-4 h-4" />}
+            >
+              Add Account
+            </Button>
+          </div>
+
+          {accounts.length === 0 ? (
+            <Card className="text-center py-12">
+              <Wallet className="w-16 h-16 mx-auto text-quaternary/30 mb-4" />
+              <h3 className="text-lg font-medium text-quaternary mb-2">
+                No accounts yet
+              </h3>
+              <p className="text-quaternary/60 mb-6">
+                Create your first account to start tracking your finances
+              </p>
+              <Button
+                onClick={() => setShowCreateAccountModal(true)}
+                icon={<Plus className="w-4 h-4" />}
+              >
+                Create Account
+              </Button>
+            </Card>
+          ) : (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={{
+                visible: { transition: { staggerChildren: 0.05 } },
+              }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              <AnimatePresence mode="popLayout">
+                {accounts.map((account) => (
+                  <motion.div
+                    key={account.id}
+                    variants={{
+                      hidden: { opacity: 0, y: 20 },
+                      visible: { opacity: 1, y: 0 },
+                    }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    layout
+                  >
+                    <Link to={`/accounts/${account.id}`}>
+                      <AccountCard account={account} />
+                    </Link>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </section>
+
         {/* Financial Overview */}
         <section>
+          <h2 className="text-xl font-semibold text-quaternary mb-4">
+            Financial Overview
+          </h2>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -193,74 +255,26 @@ export function Dashboard() {
           </motion.div>
         </section>
 
-        {/* Accounts */}
+        {/* Recent Transactions */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-quaternary">Accounts</h2>
-            <Button
-              size="sm"
-              onClick={() => setShowCreateAccountModal(true)}
-              icon={<Plus className="w-4 h-4" />}
-            >
-              Add Account
-            </Button>
+            <h2 className="text-xl font-semibold text-quaternary">
+              Recent Activity
+            </h2>
+            {accounts.length > 0 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowCreateTransactionModal(true)}
+                icon={<Plus className="w-4 h-4" />}
+                className="hidden md:flex"
+              >
+                Add Transaction
+              </Button>
+            )}
           </div>
 
-          {accounts.length === 0 ? (
-            <Card className="text-center py-12">
-              <Wallet className="w-16 h-16 mx-auto text-quaternary/30 mb-4" />
-              <h3 className="text-lg font-medium text-quaternary mb-2">
-                No accounts yet
-              </h3>
-              <p className="text-quaternary/60 mb-6">
-                Create your first account to start tracking your finances
-              </p>
-              <Button
-                onClick={() => setShowCreateAccountModal(true)}
-                icon={<Plus className="w-4 h-4" />}
-              >
-                Create Account
-              </Button>
-            </Card>
-          ) : (
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{
-                visible: { transition: { staggerChildren: 0.05 } },
-              }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              <AnimatePresence mode="popLayout">
-                {accounts.map((account) => (
-                  <motion.div
-                    key={account.id}
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 },
-                    }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    layout
-                  >
-                    <Link to={`/accounts/${account.id}`}>
-                      <AccountCard account={account} />
-                    </Link>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </section>
-
-        {/* Recent Transactions */}
-        {recentTransactions.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-quaternary">
-                Recent Activity
-              </h2>
-            </div>
-
+          {recentTransactions.length > 0 ? (
             <Card padding="none">
               <div className="divide-y divide-border">
                 {recentTransactions.map((tx, index) => {
@@ -309,8 +323,26 @@ export function Dashboard() {
                 })}
               </div>
             </Card>
-          </section>
-        )}
+          ) : accounts.length > 0 ? (
+            <Card className="text-center py-8">
+              <p className="text-quaternary/60 mb-4">
+                No transactions yet. Start tracking your spending!
+              </p>
+              <Button
+                onClick={() => setShowCreateTransactionModal(true)}
+                icon={<Plus className="w-4 h-4" />}
+              >
+                Add Transaction
+              </Button>
+            </Card>
+          ) : (
+            <Card className="text-center py-8">
+              <p className="text-quaternary/60">
+                Create an account first to start tracking transactions.
+              </p>
+            </Card>
+          )}
+        </section>
       </main>
 
       {/* Floating Action Button (Mobile) - Opens Transaction Modal */}

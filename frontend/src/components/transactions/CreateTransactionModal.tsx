@@ -20,7 +20,7 @@ import {
   TrendingUp,
   ArrowLeftRight,
   MoreHorizontal,
-  ChevronDown,
+  Check,
 } from "lucide-react";
 import { BottomSheet, Button, Input } from "../ui";
 import { transactions as transactionsApi } from "../../api/client";
@@ -216,50 +216,63 @@ export function CreateTransactionModal({
   return (
     <BottomSheet isOpen={isOpen} onClose={handleClose} title="Add Transaction">
       <div className="space-y-6">
-        {/* Account Selector */}
-        <div className="space-y-2">
+        {/* Account Selector - Inline list for mobile */}
+        <div className="space-y-3">
           <label className="block text-sm font-medium text-quaternary/80">
-            Account
+            Select Account
           </label>
-          <div className="relative">
-            <select
-              value={selectedAccountId || ""}
-              onChange={(e) =>
-                setSelectedAccountId(
-                  e.target.value ? Number(e.target.value) : null
-                )
-              }
-              className="w-full px-4 py-3 pr-10 rounded-xl bg-card border border-border text-quaternary focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none appearance-none cursor-pointer"
-            >
-              <option value="">Select an account</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} ({ACCOUNT_TYPES[account.type].label})
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-quaternary/50 pointer-events-none" />
+          <div className="grid gap-2 max-h-48 overflow-y-auto">
+            {accounts.map((account) => {
+              const isSelected = account.id === selectedAccountId;
+              const accountCurrency = CURRENCIES.find(
+                (c) => c.code === account.currency
+              );
+              const accountSymbol = accountCurrency?.symbol || "$";
+              const balance =
+                account.type === "credit_card"
+                  ? account.credit_owed || 0
+                  : account.type === "loan"
+                  ? account.loan_current_owed || 0
+                  : account.current_balance;
+
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  onClick={() => setSelectedAccountId(account.id)}
+                  className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${
+                    isSelected
+                      ? "bg-primary/15 border-2 border-primary"
+                      : "bg-card border-2 border-border hover:border-quaternary/30 active:scale-[0.98]"
+                  }`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: account.color }}
+                  />
+                  <div className="flex-1 text-left min-w-0">
+                    <p
+                      className={`font-medium truncate ${
+                        isSelected ? "text-primary" : "text-quaternary"
+                      }`}
+                    >
+                      {account.name}
+                    </p>
+                    <p className="text-sm text-quaternary/50">
+                      {ACCOUNT_TYPES[account.type].label} · {accountSymbol}
+                      {balance.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                  {isSelected && (
+                    <Check className="w-5 h-5 text-primary flex-shrink-0" />
+                  )}
+                </button>
+              );
+            })}
           </div>
-          {selectedAccount && (
-            <div className="flex items-center gap-2 mt-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: selectedAccount.color }}
-              />
-              <span className="text-sm text-quaternary/60">
-                Current: {symbol}
-                {(selectedAccount.type === "credit_card"
-                  ? selectedAccount.credit_owed || 0
-                  : selectedAccount.type === "loan"
-                  ? selectedAccount.loan_current_owed || 0
-                  : selectedAccount.current_balance
-                ).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Transaction Type Toggle - only show when account is selected */}
