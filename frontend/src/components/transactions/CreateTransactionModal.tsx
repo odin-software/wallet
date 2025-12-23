@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowUpCircle,
   ArrowDownCircle,
@@ -20,6 +20,7 @@ import {
   TrendingUp,
   ArrowLeftRight,
   MoreHorizontal,
+  ChevronDown,
 } from "lucide-react";
 import { BottomSheet, Button, Input } from "../ui";
 import { transactions as transactionsApi } from "../../api/client";
@@ -30,12 +31,13 @@ import type {
   TransactionCategory,
   CreateTransactionRequest,
 } from "../../types";
-import { CATEGORIES, CURRENCIES } from "../../types";
+import { CATEGORIES, CURRENCIES, ACCOUNT_TYPES } from "../../types";
 
 interface CreateTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  account: Account;
+  accounts: Account[];
+  preselectedAccountId?: number;
   onCreated: (transaction: Transaction) => void;
 }
 
@@ -63,9 +65,13 @@ const categoryIcons: Record<TransactionCategory, React.ElementType> = {
 export function CreateTransactionModal({
   isOpen,
   onClose,
-  account,
+  accounts,
+  preselectedAccountId,
   onCreated,
 }: CreateTransactionModalProps) {
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
+    preselectedAccountId || null
+  );
   const [transactionType, setTransactionType] =
     useState<TransactionType | null>(null);
   const [amount, setAmount] = useState("");
@@ -74,8 +80,23 @@ export function CreateTransactionModal({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currency = CURRENCIES.find((c) => c.code === account.currency);
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
+  const currency = selectedAccount
+    ? CURRENCIES.find((c) => c.code === selectedAccount.currency)
+    : null;
   const symbol = currency?.symbol || "$";
+
+  // Reset transaction type when account changes
+  useEffect(() => {
+    setTransactionType(null);
+  }, [selectedAccountId]);
+
+  // Update preselected account when prop changes
+  useEffect(() => {
+    if (preselectedAccountId) {
+      setSelectedAccountId(preselectedAccountId);
+    }
+  }, [preselectedAccountId]);
 
   // Determine available transaction types based on account type
   const getAvailableTypes = (): {
@@ -83,7 +104,9 @@ export function CreateTransactionModal({
     label: string;
     icon: React.ElementType;
   }[] => {
-    switch (account.type) {
+    if (!selectedAccount) return [];
+
+    switch (selectedAccount.type) {
       case "cash":
       case "debit":
       case "saving":
@@ -107,6 +130,9 @@ export function CreateTransactionModal({
   const availableTypes = getAvailableTypes();
 
   const resetForm = () => {
+    if (!preselectedAccountId) {
+      setSelectedAccountId(null);
+    }
     setTransactionType(null);
     setAmount("");
     setDescription("");
@@ -120,20 +146,20 @@ export function CreateTransactionModal({
   };
 
   const getPreviewBalance = () => {
-    if (!amount || !transactionType) return null;
+    if (!selectedAccount || !amount || !transactionType) return null;
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum)) return null;
 
     let currentBalance: number;
-    switch (account.type) {
+    switch (selectedAccount.type) {
       case "credit_card":
-        currentBalance = account.credit_owed || 0;
+        currentBalance = selectedAccount.credit_owed || 0;
         break;
       case "loan":
-        currentBalance = account.loan_current_owed || 0;
+        currentBalance = selectedAccount.loan_current_owed || 0;
         break;
       default:
-        currentBalance = account.current_balance;
+        currentBalance = selectedAccount.current_balance;
     }
 
     switch (transactionType) {
@@ -142,16 +168,16 @@ export function CreateTransactionModal({
       case "withdrawal":
         return currentBalance - amountNum;
       case "expense":
-        return currentBalance + amountNum; // Credit owed increases
+        return currentBalance + amountNum;
       case "payment":
-        return currentBalance - amountNum; // Owed decreases
+        return currentBalance - amountNum;
       default:
         return currentBalance;
     }
   };
 
   const handleSubmit = async () => {
-    if (!transactionType || !amount) return;
+    if (!selectedAccount || !transactionType || !amount) return;
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -170,7 +196,10 @@ export function CreateTransactionModal({
         category,
       };
 
-      const transaction = await transactionsApi.create(account.id, data);
+      const transaction = await transactionsApi.create(
+        selectedAccount.id,
+        data
+      );
       onCreated(transaction);
       handleClose();
     } catch (err) {
@@ -187,132 +216,194 @@ export function CreateTransactionModal({
   return (
     <BottomSheet isOpen={isOpen} onClose={handleClose} title="Add Transaction">
       <div className="space-y-6">
-        {/* Transaction Type Toggle */}
-        <div className="flex gap-2">
-          {availableTypes.map(({ type, label, icon: Icon }) => (
-            <button
-              key={type}
-              onClick={() => setTransactionType(type)}
-              className={`
-                flex-1 p-4 rounded-xl border-2 transition-all
-                ${
-                  transactionType === type
-                    ? type === "deposit" || type === "payment"
-                      ? "border-success bg-success/10"
-                      : "border-danger bg-danger/10"
-                    : "border-border hover:border-quaternary/30"
-                }
-              `}
-            >
-              <Icon
-                className={`w-6 h-6 mx-auto mb-2 ${
-                  transactionType === type
-                    ? type === "deposit" || type === "payment"
-                      ? "text-success"
-                      : "text-danger"
-                    : "text-quaternary/50"
-                }`}
-              />
-              <p
-                className={`text-sm font-medium ${
-                  transactionType === type
-                    ? "text-quaternary"
-                    : "text-quaternary/60"
-                }`}
-              >
-                {label}
-              </p>
-            </button>
-          ))}
-        </div>
-
-        {/* Amount Input */}
+        {/* Account Selector */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-quaternary/80">
-            Amount
+            Account
           </label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-quaternary/50">
-              {symbol}
-            </span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 text-2xl font-semibold rounded-xl bg-card border border-border text-quaternary focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-            />
+            <select
+              value={selectedAccountId || ""}
+              onChange={(e) =>
+                setSelectedAccountId(
+                  e.target.value ? Number(e.target.value) : null
+                )
+              }
+              className="w-full px-4 py-3 pr-10 rounded-xl bg-card border border-border text-quaternary focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none appearance-none cursor-pointer"
+            >
+              <option value="">Select an account</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} ({ACCOUNT_TYPES[account.type].label})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-quaternary/50 pointer-events-none" />
           </div>
-          {previewBalance !== null && (
-            <p className="text-sm text-quaternary/50">
-              New balance:{" "}
-              <span
-                className={`font-medium ${
-                  transactionType === "deposit" || transactionType === "payment"
-                    ? "text-success"
-                    : "text-danger"
-                }`}
-              >
-                {symbol}
-                {previewBalance.toLocaleString("en-US", {
+          {selectedAccount && (
+            <div className="flex items-center gap-2 mt-2">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: selectedAccount.color }}
+              />
+              <span className="text-sm text-quaternary/60">
+                Current: {symbol}
+                {(selectedAccount.type === "credit_card"
+                  ? selectedAccount.credit_owed || 0
+                  : selectedAccount.type === "loan"
+                  ? selectedAccount.loan_current_owed || 0
+                  : selectedAccount.current_balance
+                ).toLocaleString("en-US", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </span>
-            </p>
+            </div>
           )}
         </div>
 
-        {/* Category Selector */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-quaternary/80">
-            Category
-          </label>
-          <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto py-1">
-            {(Object.keys(CATEGORIES) as TransactionCategory[]).map((cat) => {
-              const Icon = categoryIcons[cat];
-              return (
+        {/* Transaction Type Toggle - only show when account is selected */}
+        {selectedAccount && availableTypes.length > 0 && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-quaternary/80">
+              Type
+            </label>
+            <div className="flex gap-2">
+              {availableTypes.map(({ type, label, icon: Icon }) => (
                 <button
-                  key={cat}
-                  onClick={() => setCategory(cat)}
+                  key={type}
+                  onClick={() => setTransactionType(type)}
                   className={`
-                    p-2 rounded-xl transition-all flex flex-col items-center gap-1
+                    flex-1 p-4 rounded-xl border-2 transition-all
                     ${
-                      category === cat
-                        ? "bg-primary/20 border-2 border-primary"
-                        : "bg-card border border-border hover:border-quaternary/30"
+                      transactionType === type
+                        ? type === "deposit" || type === "payment"
+                          ? "border-success bg-success/10"
+                          : "border-danger bg-danger/10"
+                        : "border-border hover:border-quaternary/30"
                     }
                   `}
                 >
                   <Icon
-                    className={`w-5 h-5 ${
-                      category === cat ? "text-primary" : "text-quaternary/60"
-                    }`}
-                  />
-                  <span
-                    className={`text-[10px] ${
-                      category === cat
-                        ? "text-primary font-medium"
+                    className={`w-6 h-6 mx-auto mb-2 ${
+                      transactionType === type
+                        ? type === "deposit" || type === "payment"
+                          ? "text-success"
+                          : "text-danger"
                         : "text-quaternary/50"
                     }`}
+                  />
+                  <p
+                    className={`text-sm font-medium ${
+                      transactionType === type
+                        ? "text-quaternary"
+                        : "text-quaternary/60"
+                    }`}
                   >
-                    {CATEGORIES[cat].label}
-                  </span>
+                    {label}
+                  </p>
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Description */}
-        <Input
-          label="Description (optional)"
-          placeholder="e.g., Grocery shopping at Costco"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
+        {/* Amount Input - only show when type is selected */}
+        {transactionType && (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-quaternary/80">
+                Amount
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-quaternary/50 pointer-events-none">
+                  {symbol}
+                </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full pl-16 pr-4 py-4 text-2xl font-semibold rounded-xl bg-card border border-border text-quaternary focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                />
+              </div>
+              {previewBalance !== null && (
+                <p className="text-sm text-quaternary/50">
+                  New balance:{" "}
+                  <span
+                    className={`font-medium ${
+                      transactionType === "deposit" ||
+                      transactionType === "payment"
+                        ? "text-success"
+                        : "text-danger"
+                    }`}
+                  >
+                    {symbol}
+                    {previewBalance.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {/* Category Selector */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-quaternary/80">
+                Category
+              </label>
+              <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto py-1">
+                {(Object.keys(CATEGORIES) as TransactionCategory[]).map(
+                  (cat) => {
+                    const Icon = categoryIcons[cat];
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setCategory(cat)}
+                        className={`
+                        p-2 rounded-xl transition-all flex flex-col items-center gap-1
+                        ${
+                          category === cat
+                            ? "bg-primary/20 border-2 border-primary"
+                            : "bg-card border border-border hover:border-quaternary/30"
+                        }
+                      `}
+                      >
+                        <Icon
+                          className={`w-5 h-5 ${
+                            category === cat
+                              ? "text-primary"
+                              : "text-quaternary/60"
+                          }`}
+                        />
+                        <span
+                          className={`text-[10px] ${
+                            category === cat
+                              ? "text-primary font-medium"
+                              : "text-quaternary/50"
+                          }`}
+                        >
+                          {CATEGORIES[cat].label}
+                        </span>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            </div>
+
+            {/* Description */}
+            <Input
+              label="Description (optional)"
+              placeholder="e.g., Grocery shopping at Costco"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </>
+        )}
 
         {/* Error */}
         {error && (
@@ -325,7 +416,7 @@ export function CreateTransactionModal({
         <Button
           onClick={handleSubmit}
           isLoading={isLoading}
-          disabled={!transactionType || !amount}
+          disabled={!selectedAccount || !transactionType || !amount}
           className="w-full"
           size="lg"
         >

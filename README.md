@@ -23,17 +23,30 @@ A professional, mobile-first personal finance management application built with 
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.24+
 - Node.js 20+
 - npm or pnpm
 
-### Quick Start
+### Using Makefile (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/kengru/odin-wallet.git
 cd odin-wallet
 
+# Option 1: Build frontend and run Go server (single terminal, no HMR)
+make dev-build
+
+# Option 2: Run with hot-reload (requires 2 terminals)
+# Terminal 1:
+make dev-backend
+# Terminal 2:
+make dev-frontend
+```
+
+### Manual Setup
+
+```bash
 # Start the backend (from root directory)
 go mod download
 go run cmd/server/main.go
@@ -43,6 +56,17 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Available Make Commands
+
+| Command             | Description                                        |
+| ------------------- | -------------------------------------------------- |
+| `make dev-build`    | Build frontend and run Go server (single terminal) |
+| `make dev-backend`  | Run Go server only                                 |
+| `make dev-frontend` | Run Vite dev server with HMR                       |
+| `make build`        | Build production binary                            |
+| `make run`          | Run Go server (assumes frontend already built)     |
+| `make clean`        | Remove build artifacts                             |
 
 - Backend runs on `http://localhost:7009`
 - Frontend dev server runs on `http://localhost:5173` (proxies API requests to backend)

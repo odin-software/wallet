@@ -345,7 +345,7 @@ func (h *AccountHandler) Overview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(`
-		SELECT type, current_balance, credit_owed, loan_current_owed
+		SELECT type, current_balance, credit_owed, loan_current_owed, loan_initial_amount
 		FROM accounts
 		WHERE user_id = ?
 	`, userID)
@@ -363,9 +363,9 @@ func (h *AccountHandler) Overview(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var accountType string
 		var currentBalance float64
-		var creditOwed, loanCurrentOwed sql.NullFloat64
+		var creditOwed, loanCurrentOwed, loanInitialAmount sql.NullFloat64
 
-		err := rows.Scan(&accountType, &currentBalance, &creditOwed, &loanCurrentOwed)
+		err := rows.Scan(&accountType, &currentBalance, &creditOwed, &loanCurrentOwed, &loanInitialAmount)
 		if err != nil {
 			continue
 		}
@@ -380,9 +380,16 @@ func (h *AccountHandler) Overview(w http.ResponseWriter, r *http.Request) {
 				overview.LiabilitiesByType[accountType] += creditOwed.Float64
 			}
 		case models.AccountTypeLoan:
+			// Use loan_current_owed if set, otherwise fall back to loan_initial_amount
+			var loanLiability float64
 			if loanCurrentOwed.Valid {
-				overview.TotalLiabilities += loanCurrentOwed.Float64
-				overview.LiabilitiesByType[accountType] += loanCurrentOwed.Float64
+				loanLiability = loanCurrentOwed.Float64
+			} else if loanInitialAmount.Valid {
+				loanLiability = loanInitialAmount.Float64
+			}
+			if loanLiability > 0 {
+				overview.TotalLiabilities += loanLiability
+				overview.LiabilitiesByType[accountType] += loanLiability
 			}
 		}
 	}

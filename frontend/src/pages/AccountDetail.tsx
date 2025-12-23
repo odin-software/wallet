@@ -385,7 +385,8 @@ export function AccountDetail() {
       <CreateTransactionModal
         isOpen={showTransactionModal}
         onClose={() => setShowTransactionModal(false)}
-        account={account}
+        accounts={[account]}
+        preselectedAccountId={account.id}
         onCreated={handleTransactionCreated}
       />
 

@@ -10,6 +10,7 @@ import {
 import { Button, Card } from "../components/ui";
 import { AccountCard } from "../components/accounts/AccountCard";
 import { CreateAccountModal } from "../components/accounts/CreateAccountModal";
+import { CreateTransactionModal } from "../components/transactions/CreateTransactionModal";
 import type { Account, FinancialOverview, Transaction } from "../types";
 import { CURRENCIES } from "../types";
 
@@ -22,7 +23,9 @@ export function Dashboard() {
     []
   );
   const [isLoading, setIsLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
+  const [showCreateTransactionModal, setShowCreateTransactionModal] =
+    useState(false);
 
   const fetchData = async () => {
     try {
@@ -55,13 +58,26 @@ export function Dashboard() {
     fetchData(); // Refresh overview
   };
 
-  const formatCurrency = (amount: number, currency = "USD") => {
+  const handleTransactionCreated = () => {
+    fetchData(); // Refresh everything including overview and recent transactions
+  };
+
+  const formatCurrency = (
+    amount: number,
+    currency = "USD",
+    preserveSign = false
+  ) => {
     const curr = CURRENCIES.find((c) => c.code === currency);
     const symbol = curr?.symbol || "$";
-    return `${symbol}${Math.abs(amount).toLocaleString("en-US", {
+    const isNegative = amount < 0;
+    const absValue = Math.abs(amount).toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })}`;
+    });
+    if (preserveSign && isNegative) {
+      return `-${symbol}${absValue}`;
+    }
+    return `${symbol}${absValue}`;
   };
 
   if (isLoading) {
@@ -106,16 +122,38 @@ export function Dashboard() {
             {/* Net Worth */}
             <Card
               variant="elevated"
-              className="md:col-span-1 bg-gradient-to-br from-card to-tertiary"
+              className={`md:col-span-1 bg-gradient-to-br ${
+                (overview?.net_worth || 0) >= 0
+                  ? "from-card to-tertiary"
+                  : "from-danger/10 to-tertiary border-danger/20"
+              }`}
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 rounded-xl bg-primary/10">
-                  <Wallet className="w-6 h-6 text-primary" />
+                <div
+                  className={`p-3 rounded-xl ${
+                    (overview?.net_worth || 0) >= 0
+                      ? "bg-primary/10"
+                      : "bg-danger/10"
+                  }`}
+                >
+                  <Wallet
+                    className={`w-6 h-6 ${
+                      (overview?.net_worth || 0) >= 0
+                        ? "text-primary"
+                        : "text-danger"
+                    }`}
+                  />
                 </div>
                 <div>
                   <p className="text-sm text-quaternary/60">Net Worth</p>
-                  <p className="text-2xl font-bold text-quaternary">
-                    {formatCurrency(overview?.net_worth || 0)}
+                  <p
+                    className={`text-2xl font-bold ${
+                      (overview?.net_worth || 0) >= 0
+                        ? "text-quaternary"
+                        : "text-danger"
+                    }`}
+                  >
+                    {formatCurrency(overview?.net_worth || 0, "USD", true)}
                   </p>
                 </div>
               </div>
@@ -161,7 +199,7 @@ export function Dashboard() {
             <h2 className="text-xl font-semibold text-quaternary">Accounts</h2>
             <Button
               size="sm"
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowCreateAccountModal(true)}
               icon={<Plus className="w-4 h-4" />}
             >
               Add Account
@@ -178,7 +216,7 @@ export function Dashboard() {
                 Create your first account to start tracking your finances
               </p>
               <Button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => setShowCreateAccountModal(true)}
                 icon={<Plus className="w-4 h-4" />}
               >
                 Create Account
@@ -275,23 +313,33 @@ export function Dashboard() {
         )}
       </main>
 
-      {/* Floating Action Button (Mobile) */}
-      <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setShowCreateModal(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-tertiary rounded-full shadow-lg shadow-primary/30 flex items-center justify-center md:hidden"
-      >
-        <Plus className="w-6 h-6" />
-      </motion.button>
+      {/* Floating Action Button (Mobile) - Opens Transaction Modal */}
+      {accounts.length > 0 && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowCreateTransactionModal(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-tertiary rounded-full shadow-lg shadow-primary/30 flex items-center justify-center md:hidden"
+        >
+          <Plus className="w-6 h-6" />
+        </motion.button>
+      )}
 
       {/* Create Account Modal */}
       <CreateAccountModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        isOpen={showCreateAccountModal}
+        onClose={() => setShowCreateAccountModal(false)}
         onCreated={handleAccountCreated}
+      />
+
+      {/* Create Transaction Modal */}
+      <CreateTransactionModal
+        isOpen={showCreateTransactionModal}
+        onClose={() => setShowCreateTransactionModal(false)}
+        accounts={accounts}
+        onCreated={handleTransactionCreated}
       />
     </div>
   );
