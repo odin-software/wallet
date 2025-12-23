@@ -2,12 +2,19 @@
 export interface User {
   id: number;
   email: string;
+  name?: string;
+  preferred_currency: string;
   created_at: string;
 }
 
 export interface AuthResponse {
   user: User;
   message?: string;
+}
+
+export interface UpdatePreferencesRequest {
+  name?: string;
+  preferred_currency?: string;
 }
 
 // Account types
@@ -119,8 +126,16 @@ export interface FinancialOverview {
   total_assets: number;
   total_liabilities: number;
   net_worth: number;
+  base_currency: string;
   assets_by_type: Record<string, number>;
   liabilities_by_type: Record<string, number>;
+}
+
+// Exchange Rates
+export interface ExchangeRates {
+  base: string;
+  rates: Record<string, number>;
+  updated_at: string;
 }
 
 // Category metadata
@@ -175,16 +190,9 @@ export const ACCOUNT_COLORS = [
   "#84CC16", // Lime
 ];
 
-// Currency options
+// Currency options (DOP, USD, EUR in order of importance)
 export const CURRENCIES = [
-  { code: "USD", symbol: "$", name: "US Dollar" },
-  { code: "EUR", symbol: "€", name: "Euro" },
-  { code: "GBP", symbol: "£", name: "British Pound" },
-  { code: "JPY", symbol: "¥", name: "Japanese Yen" },
-  { code: "CAD", symbol: "C$", name: "Canadian Dollar" },
-  { code: "AUD", symbol: "A$", name: "Australian Dollar" },
-  { code: "CHF", symbol: "Fr", name: "Swiss Franc" },
-  { code: "MXN", symbol: "$", name: "Mexican Peso" },
-  { code: "BRL", symbol: "R$", name: "Brazilian Real" },
   { code: "DOP", symbol: "RD$", name: "Dominican Peso" },
+  { code: "USD", symbol: "US$", name: "US Dollar" },
+  { code: "EUR", symbol: "EUR€", name: "Euro" },
 ];

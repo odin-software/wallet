@@ -7,6 +7,8 @@ import type {
   CreateTransactionRequest,
   TransactionListResponse,
   FinancialOverview,
+  ExchangeRates,
+  UpdatePreferencesRequest,
 } from "../types";
 
 const API_BASE = "/api";
@@ -63,6 +65,15 @@ export const auth = {
   me: (): Promise<AuthResponse> => request("/auth/me"),
 };
 
+// User API
+export const user = {
+  updatePreferences: (data: UpdatePreferencesRequest): Promise<AuthResponse> =>
+    request("/user/preferences", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+};
+
 // Accounts API
 export const accounts = {
   list: (): Promise<Account[]> => request("/accounts"),
@@ -109,6 +120,25 @@ export const transactions = {
 
   recent: (limit = 10): Promise<Transaction[]> =>
     request(`/transactions/recent?limit=${limit}`),
+};
+
+// Exchange Rates API
+export const exchangeRates = {
+  getRates: (base = "USD"): Promise<ExchangeRates> =>
+    request(`/exchange-rates?base=${base}`),
+
+  convert: (
+    from: string,
+    to: string,
+    amount: number
+  ): Promise<{
+    from: string;
+    to: string;
+    amount: number;
+    converted: number;
+    rate: number;
+  }> =>
+    request(`/exchange-rates/convert?from=${from}&to=${to}&amount=${amount}`),
 };
 
 export { ApiError };

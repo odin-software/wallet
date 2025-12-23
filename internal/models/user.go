@@ -3,10 +3,12 @@ package models
 import "time"
 
 type User struct {
-	ID           int64     `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                int64     `json:"id"`
+	Email             string    `json:"email"`
+	Name              *string   `json:"name,omitempty"`
+	PreferredCurrency string    `json:"preferred_currency"`
+	PasswordHash      string    `json:"-"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 type RegisterRequest struct {
@@ -22,4 +24,9 @@ type LoginRequest struct {
 type AuthResponse struct {
 	User    *User  `json:"user"`
 	Message string `json:"message,omitempty"`
+}
+
+type UpdatePreferencesRequest struct {
+	Name              *string `json:"name,omitempty"`
+	PreferredCurrency *string `json:"preferred_currency,omitempty"`
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/kengru/odin-wallet/internal/handlers"
 	appMiddleware "github.com/kengru/odin-wallet/internal/middleware"
+	"github.com/kengru/odin-wallet/internal/services"
 	"github.com/kengru/odin-wallet/pkg/database"
 )
 
@@ -37,10 +38,20 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize exchange rate service
+	exchangeService := services.NewExchangeService(db)
+	if err := exchangeService.Init(); err != nil {
+		log.Printf("Warning: Failed to initialize exchange rates: %v", err)
+		// Continue anyway - exchange rates are nice-to-have
+	}
+	// Start daily updater
+	exchangeService.StartDailyUpdater()
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(db, sessionSecret)
-	accountHandler := handlers.NewAccountHandler(db)
+	accountHandler := handlers.NewAccountHandler(db, exchangeService)
 	transactionHandler := handlers.NewTransactionHandler(db)
+	exchangeHandler := handlers.NewExchangeHandler(exchangeService)
 
 	// Create router
 	r := chi.NewRouter()
@@ -64,6 +75,9 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(appMiddleware.Auth(db, sessionSecret))
 
+			// User preferences
+			r.Put("/user/preferences", authHandler.UpdatePreferences)
+
 			// Account routes
 			r.Route("/accounts", func(r chi.Router) {
 				r.Get("/", accountHandler.List)
@@ -82,6 +96,10 @@ func main() {
 
 			// Recent transactions across all accounts
 			r.Get("/transactions/recent", transactionHandler.Recent)
+
+			// Exchange rates
+			r.Get("/exchange-rates", exchangeHandler.GetRates)
+			r.Get("/exchange-rates/convert", exchangeHandler.Convert)
 		})
 	})
 

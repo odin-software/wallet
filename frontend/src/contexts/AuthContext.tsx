@@ -65,6 +65,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await auth.me();
+      setUser(response.user);
+    } catch {
+      // If refresh fails, don't log out
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -74,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshUser,
         error,
         clearError,
       }}

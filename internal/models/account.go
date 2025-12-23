@@ -147,10 +147,11 @@ type UpdateAccountRequest struct {
 
 // FinancialOverview represents the user's financial summary
 type FinancialOverview struct {
-	TotalAssets      float64            `json:"total_assets"`
-	TotalLiabilities float64            `json:"total_liabilities"`
-	NetWorth         float64            `json:"net_worth"`
-	AssetsByType     map[string]float64 `json:"assets_by_type"`
+	TotalAssets       float64            `json:"total_assets"`
+	TotalLiabilities  float64            `json:"total_liabilities"`
+	NetWorth          float64            `json:"net_worth"`
+	BaseCurrency      string             `json:"base_currency"`
+	AssetsByType      map[string]float64 `json:"assets_by_type"`
 	LiabilitiesByType map[string]float64 `json:"liabilities_by_type"`
 }
 

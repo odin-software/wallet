@@ -14,13 +14,13 @@ import (
 )
 
 type AuthHandler struct {
-	db           *sql.DB
+	db            *sql.DB
 	sessionSecret string
 }
 
 func NewAuthHandler(db *sql.DB, sessionSecret string) *AuthHandler {
 	return &AuthHandler{
-		db:           db,
+		db:            db,
 		sessionSecret: sessionSecret,
 	}
 }
@@ -80,8 +80,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Return user
 	user := &models.User{
-		ID:    userID,
-		Email: req.Email,
+		ID:                userID,
+		Email:             req.Email,
+		PreferredCurrency: "DOP", // Default
 	}
 
 	jsonResponse(w, models.AuthResponse{
@@ -101,10 +102,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Find user
 	var user models.User
+	var name sql.NullString
+	var preferredCurrency sql.NullString
 	err := h.db.QueryRow(
-		"SELECT id, email, password_hash, created_at FROM users WHERE email = ?",
+		"SELECT id, email, name, preferred_currency, password_hash, created_at FROM users WHERE email = ?",
 		req.Email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Email, &name, &preferredCurrency, &user.PasswordHash, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		jsonError(w, "Invalid email or password", http.StatusUnauthorized)
@@ -113,6 +116,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		jsonError(w, "Failed to find user", http.StatusInternalServerError)
 		return
+	}
+
+	if name.Valid {
+		user.Name = &name.String
+	}
+	user.PreferredCurrency = "DOP" // Default
+	if preferredCurrency.Valid {
+		user.PreferredCurrency = preferredCurrency.String
 	}
 
 	// Verify password
@@ -166,13 +177,15 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	// Find session and user
 	var user models.User
+	var name sql.NullString
+	var preferredCurrency sql.NullString
 	var expiresAt time.Time
 	err = h.db.QueryRow(`
-		SELECT u.id, u.email, u.created_at, s.expires_at
+		SELECT u.id, u.email, u.name, u.preferred_currency, u.created_at, s.expires_at
 		FROM users u
 		JOIN sessions s ON u.id = s.user_id
 		WHERE s.id = ?
-	`, cookie.Value).Scan(&user.ID, &user.Email, &user.CreatedAt, &expiresAt)
+	`, cookie.Value).Scan(&user.ID, &user.Email, &name, &preferredCurrency, &user.CreatedAt, &expiresAt)
 
 	if err == sql.ErrNoRows {
 		jsonError(w, "Session not found", http.StatusUnauthorized)
@@ -190,7 +203,119 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if name.Valid {
+		user.Name = &name.String
+	}
+	user.PreferredCurrency = "DOP" // Default
+	if preferredCurrency.Valid {
+		user.PreferredCurrency = preferredCurrency.String
+	}
+
 	jsonResponse(w, models.AuthResponse{User: &user}, http.StatusOK)
+}
+
+func (h *AuthHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_id")
+	if err != nil {
+		jsonError(w, "Not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Get user ID from session
+	var userID int64
+	var expiresAt time.Time
+	err = h.db.QueryRow(`
+		SELECT user_id, expires_at FROM sessions WHERE id = ?
+	`, cookie.Value).Scan(&userID, &expiresAt)
+
+	if err == sql.ErrNoRows {
+		jsonError(w, "Session not found", http.StatusUnauthorized)
+		return
+	}
+	if err != nil {
+		jsonError(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	if time.Now().After(expiresAt) {
+		jsonError(w, "Session expired", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse request
+	var req models.UpdatePreferencesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Build update query
+	updates := []string{}
+	args := []interface{}{}
+
+	if req.Name != nil {
+		updates = append(updates, "name = ?")
+		args = append(args, *req.Name)
+	}
+
+	if req.PreferredCurrency != nil {
+		// Validate currency
+		validCurrencies := []string{"DOP", "USD", "EUR"}
+		valid := false
+		for _, c := range validCurrencies {
+			if c == *req.PreferredCurrency {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			jsonError(w, "Invalid currency. Must be DOP, USD, or EUR", http.StatusBadRequest)
+			return
+		}
+		updates = append(updates, "preferred_currency = ?")
+		args = append(args, *req.PreferredCurrency)
+	}
+
+	if len(updates) == 0 {
+		jsonError(w, "No fields to update", http.StatusBadRequest)
+		return
+	}
+
+	// Execute update
+	query := "UPDATE users SET " + strings.Join(updates, ", ") + " WHERE id = ?"
+	args = append(args, userID)
+
+	_, err = h.db.Exec(query, args...)
+	if err != nil {
+		jsonError(w, "Failed to update preferences", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch updated user
+	var user models.User
+	var name sql.NullString
+	var preferredCurrency sql.NullString
+	err = h.db.QueryRow(`
+		SELECT id, email, name, preferred_currency, created_at FROM users WHERE id = ?
+	`, userID).Scan(&user.ID, &user.Email, &name, &preferredCurrency, &user.CreatedAt)
+
+	if err != nil {
+		jsonError(w, "Failed to fetch updated user", http.StatusInternalServerError)
+		return
+	}
+
+	if name.Valid {
+		user.Name = &name.String
+	}
+	user.PreferredCurrency = "DOP"
+	if preferredCurrency.Valid {
+		user.PreferredCurrency = preferredCurrency.String
+	}
+
+	jsonResponse(w, models.AuthResponse{
+		User:    &user,
+		Message: "Preferences updated successfully",
+	}, http.StatusOK)
 }
 
 func (h *AuthHandler) createSession(userID int64) (string, error) {

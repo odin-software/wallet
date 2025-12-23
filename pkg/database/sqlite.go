@@ -88,12 +88,23 @@ func migrate(db *sql.DB) error {
 			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 		)`,
 
+		// Exchange rates table
+		`CREATE TABLE IF NOT EXISTS exchange_rates (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			base_currency TEXT NOT NULL,
+			target_currency TEXT NOT NULL,
+			rate REAL NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(base_currency, target_currency)
+		)`,
+
 		// Indexes for performance
 		`CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_exchange_rates_base ON exchange_rates(base_currency)`,
 	}
 
 	for _, migration := range migrations {
@@ -102,5 +113,33 @@ func migrate(db *sql.DB) error {
 		}
 	}
 
+	// Run ALTER TABLE migrations (these are idempotent - check if column exists first)
+	alterMigrations := []struct {
+		table  string
+		column string
+		sql    string
+	}{
+		{"users", "name", "ALTER TABLE users ADD COLUMN name TEXT"},
+		{"users", "preferred_currency", "ALTER TABLE users ADD COLUMN preferred_currency TEXT DEFAULT 'DOP'"},
+	}
+
+	for _, m := range alterMigrations {
+		if !columnExists(db, m.table, m.column) {
+			if _, err := db.Exec(m.sql); err != nil {
+				return fmt.Errorf("alter migration failed: %w\nSQL: %s", err, m.sql)
+			}
+		}
+	}
+
 	return nil
+}
+
+// columnExists checks if a column exists in a table
+func columnExists(db *sql.DB, table, column string) bool {
+	query := fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name='%s'", table, column)
+	var count int
+	if err := db.QueryRow(query).Scan(&count); err != nil {
+		return false
+	}
+	return count > 0
 }

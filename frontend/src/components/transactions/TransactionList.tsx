@@ -53,7 +53,7 @@ const categoryIcons: Record<TransactionCategory, React.ElementType> = {
 
 export function TransactionList({
   transactions,
-  currency = "USD",
+  currency = "DOP",
 }: TransactionListProps) {
   const currencyInfo = CURRENCIES.find((c) => c.code === currency);
   const symbol = currencyInfo?.symbol || "$";

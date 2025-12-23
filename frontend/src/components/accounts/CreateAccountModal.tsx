@@ -41,7 +41,7 @@ export function CreateAccountModal({
   const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState(ACCOUNT_COLORS[0]);
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("DOP");
 
   // Type-specific fields
   const [initialBalance, setInitialBalance] = useState("");
@@ -58,7 +58,7 @@ export function CreateAccountModal({
     setAccountType(null);
     setName("");
     setColor(ACCOUNT_COLORS[0]);
-    setCurrency("USD");
+    setCurrency("DOP");
     setInitialBalance("");
     setCreditLimit("");
     setCreditOwed("");

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,14 +11,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/kengru/odin-wallet/internal/middleware"
 	"github.com/kengru/odin-wallet/internal/models"
+	"github.com/kengru/odin-wallet/internal/services"
 )
 
 type AccountHandler struct {
-	db *sql.DB
+	db              *sql.DB
+	exchangeService *services.ExchangeService
 }
 
-func NewAccountHandler(db *sql.DB) *AccountHandler {
-	return &AccountHandler{db: db}
+func NewAccountHandler(db *sql.DB, exchangeService *services.ExchangeService) *AccountHandler {
+	return &AccountHandler{db: db, exchangeService: exchangeService}
 }
 
 func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -344,8 +347,21 @@ func (h *AccountHandler) Overview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user's preferred currency
+	var preferredCurrency sql.NullString
+	err := h.db.QueryRow("SELECT preferred_currency FROM users WHERE id = ?", userID).Scan(&preferredCurrency)
+	if err != nil && err != sql.ErrNoRows {
+		jsonError(w, "Failed to fetch user preferences", http.StatusInternalServerError)
+		return
+	}
+
+	baseCurrency := "DOP" // Default to DOP
+	if preferredCurrency.Valid && preferredCurrency.String != "" {
+		baseCurrency = preferredCurrency.String
+	}
+
 	rows, err := h.db.Query(`
-		SELECT type, current_balance, credit_owed, loan_current_owed, loan_initial_amount
+		SELECT type, currency, current_balance, credit_owed, loan_current_owed, loan_initial_amount
 		FROM accounts
 		WHERE user_id = ?
 	`, userID)
@@ -356,28 +372,45 @@ func (h *AccountHandler) Overview(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	overview := models.FinancialOverview{
+		BaseCurrency:      baseCurrency,
 		AssetsByType:      make(map[string]float64),
 		LiabilitiesByType: make(map[string]float64),
 	}
 
 	for rows.Next() {
 		var accountType string
+		var currency string
 		var currentBalance float64
 		var creditOwed, loanCurrentOwed, loanInitialAmount sql.NullFloat64
 
-		err := rows.Scan(&accountType, &currentBalance, &creditOwed, &loanCurrentOwed, &loanInitialAmount)
+		err := rows.Scan(&accountType, &currency, &currentBalance, &creditOwed, &loanCurrentOwed, &loanInitialAmount)
 		if err != nil {
 			continue
 		}
 
+		// Convert amount to base currency
+		convertToBase := func(amount float64) float64 {
+			if currency == baseCurrency || h.exchangeService == nil {
+				return amount
+			}
+			converted, err := h.exchangeService.Convert(amount, currency, baseCurrency)
+			if err != nil {
+				log.Printf("Currency conversion failed %s->%s: %v", currency, baseCurrency, err)
+				return amount
+			}
+			return converted
+		}
+
 		switch models.AccountType(accountType) {
 		case models.AccountTypeCash, models.AccountTypeDebit, models.AccountTypeSaving, models.AccountTypeInvestment:
-			overview.TotalAssets += currentBalance
-			overview.AssetsByType[accountType] += currentBalance
+			convertedBalance := convertToBase(currentBalance)
+			overview.TotalAssets += convertedBalance
+			overview.AssetsByType[accountType] += convertedBalance
 		case models.AccountTypeCreditCard:
 			if creditOwed.Valid {
-				overview.TotalLiabilities += creditOwed.Float64
-				overview.LiabilitiesByType[accountType] += creditOwed.Float64
+				convertedOwed := convertToBase(creditOwed.Float64)
+				overview.TotalLiabilities += convertedOwed
+				overview.LiabilitiesByType[accountType] += convertedOwed
 			}
 		case models.AccountTypeLoan:
 			// Use loan_current_owed if set, otherwise fall back to loan_initial_amount
@@ -388,8 +421,9 @@ func (h *AccountHandler) Overview(w http.ResponseWriter, r *http.Request) {
 				loanLiability = loanInitialAmount.Float64
 			}
 			if loanLiability > 0 {
-				overview.TotalLiabilities += loanLiability
-				overview.LiabilitiesByType[accountType] += loanLiability
+				convertedLiability := convertToBase(loanLiability)
+				overview.TotalLiabilities += convertedLiability
+				overview.LiabilitiesByType[accountType] += convertedLiability
 			}
 		}
 	}

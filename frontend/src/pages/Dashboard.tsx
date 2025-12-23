@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, TrendingUp, TrendingDown, Wallet, LogOut } from "lucide-react";
+import {
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  LogOut,
+  Settings,
+} from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
   accounts as accountsApi,
@@ -64,7 +71,7 @@ export function Dashboard() {
 
   const formatCurrency = (
     amount: number,
-    currency = "USD",
+    currency = "DOP",
     preserveSign = false
   ) => {
     const curr = CURRENCIES.find((c) => c.code === currency);
@@ -102,12 +109,24 @@ export function Dashboard() {
               <span className="text-primary">Odin</span>
               <span className="text-quaternary"> Wallet</span>
             </h1>
-            <p className="text-sm text-quaternary/60">{user?.email}</p>
+            <p className="text-sm text-quaternary/60">
+              {user?.name || user?.email}
+            </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/settings")}
+            >
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Settings</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -173,9 +192,16 @@ export function Dashboard() {
 
         {/* Financial Overview */}
         <section>
-          <h2 className="text-xl font-semibold text-quaternary mb-4">
-            Financial Overview
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-quaternary">
+              Financial Overview
+            </h2>
+            {overview?.base_currency && (
+              <span className="text-sm text-quaternary/50">
+                All values in {overview.base_currency}
+              </span>
+            )}
+          </div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -215,7 +241,11 @@ export function Dashboard() {
                         : "text-danger"
                     }`}
                   >
-                    {formatCurrency(overview?.net_worth || 0, "USD", true)}
+                    {formatCurrency(
+                      overview?.net_worth || 0,
+                      overview?.base_currency,
+                      true
+                    )}
                   </p>
                 </div>
               </div>
@@ -230,7 +260,10 @@ export function Dashboard() {
                 <div>
                   <p className="text-sm text-quaternary/60">Total Assets</p>
                   <p className="text-xl font-bold text-success">
-                    {formatCurrency(overview?.total_assets || 0)}
+                    {formatCurrency(
+                      overview?.total_assets || 0,
+                      overview?.base_currency
+                    )}
                   </p>
                 </div>
               </div>
@@ -247,7 +280,10 @@ export function Dashboard() {
                     Total Liabilities
                   </p>
                   <p className="text-xl font-bold text-danger">
-                    {formatCurrency(overview?.total_liabilities || 0)}
+                    {formatCurrency(
+                      overview?.total_liabilities || 0,
+                      overview?.base_currency
+                    )}
                   </p>
                 </div>
               </div>
@@ -275,7 +311,7 @@ export function Dashboard() {
           </div>
 
           {recentTransactions.length > 0 ? (
-            <Card padding="none">
+            <Card padding="none" className="overflow-hidden">
               <div className="divide-y divide-border">
                 {recentTransactions.map((tx, index) => {
                   const account = accounts.find((a) => a.id === tx.account_id);
@@ -285,8 +321,8 @@ export function Dashboard() {
                   return (
                     <motion.div
                       key={tx.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       transition={{ delay: index * 0.05 }}
                       className="p-4 flex items-center justify-between hover:bg-border/30 transition-colors"
                     >

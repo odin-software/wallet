@@ -72,8 +72,9 @@ export function AccountCard({ account }: AccountCardProps) {
 
   return (
     <motion.div
-      whileHover={{ y: -4, scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -2, scale: 1.005 }}
+      whileTap={{ scale: 0.995 }}
+      transition={{ duration: 0.15 }}
       className="relative overflow-hidden rounded-2xl bg-card border border-border p-5 cursor-pointer group"
       style={{
         borderColor: `${account.color}30`,
