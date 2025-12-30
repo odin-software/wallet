@@ -14,12 +14,18 @@ import { useAuth } from "../hooks/useAuth";
 import {
   accounts as accountsApi,
   transactions as transactionsApi,
+  exchangeRates as exchangeApi,
 } from "../api/client";
 import { Button, Card } from "../components/ui";
 import { AccountCard } from "../components/accounts/AccountCard";
 import { CreateAccountModal } from "../components/accounts/CreateAccountModal";
 import { CreateTransactionModal } from "../components/transactions/CreateTransactionModal";
-import type { Account, FinancialOverview, Transaction } from "../types";
+import type {
+  Account,
+  FinancialOverview,
+  Transaction,
+  ExchangeRates,
+} from "../types";
 import { CURRENCIES } from "../types";
 
 export function Dashboard() {
@@ -30,6 +36,9 @@ export function Dashboard() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
     []
   );
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
   const [showCreateTransactionModal, setShowCreateTransactionModal] =
@@ -37,14 +46,17 @@ export function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [accountsData, overviewData, transactionsData] = await Promise.all([
-        accountsApi.list(),
-        accountsApi.overview(),
-        transactionsApi.recent(5),
-      ]);
+      const [accountsData, overviewData, transactionsData, ratesData] =
+        await Promise.all([
+          accountsApi.list(),
+          accountsApi.overview(),
+          transactionsApi.recent(5),
+          exchangeApi.getRates("USD"),
+        ]);
       setAccounts(accountsData);
       setOverview(overviewData);
       setRecentTransactions(transactionsData);
+      setExchangeRates(ratesData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
@@ -202,12 +214,36 @@ export function Dashboard() {
         {/* Financial Overview */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-quaternary">
-              Financial Overview
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-quaternary">
+                Financial Overview
+              </h2>
+              {overview?.base_currency && exchangeRates && (
+                <span className="text-xs text-quaternary/40 hidden sm:inline">
+                  {(() => {
+                    const base = overview.base_currency;
+                    const rates = exchangeRates.rates;
+                    // Show conversion rates FROM other currencies TO user's base currency
+                    const otherCurrencies = ["DOP", "USD", "EUR"].filter(
+                      (c) => c !== base
+                    );
+                    return otherCurrencies.map((curr, i) => {
+                      // Rate from curr to base = rates[base] / rates[curr]
+                      const rate = rates[base] / rates[curr];
+                      return (
+                        <span key={curr}>
+                          {i > 0 && " · "}1 {curr} = {rate?.toFixed(2) || "—"}{" "}
+                          {base}
+                        </span>
+                      );
+                    });
+                  })()}
+                </span>
+              )}
+            </div>
             {overview?.base_currency && (
               <span className="text-sm text-quaternary/50">
-                All values in {overview.base_currency}
+                in {overview.base_currency}
               </span>
             )}
           </div>

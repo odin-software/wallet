@@ -1,0 +1,50 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0F1822"/>
+
+  <!-- Decorative gradient circles -->
+  <circle cx="100" cy="100" r="300" fill="url(#grad1)" opacity="0.15"/>
+  <circle cx="1100" cy="530" r="250" fill="url(#grad2)" opacity="0.1"/>
+
+  <!-- Wallet Icon -->
+  <g transform="translate(150, 180)">
+    <rect x="0" y="40" width="180" height="130" rx="20" stroke="#DDE61F" stroke-width="8" fill="none"/>
+    <line x1="40" y1="105" x2="140" y2="105" stroke="#DDE61F" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="60" cy="140" r="10" fill="#DDE61F"/>
+    <circle cx="120" cy="140" r="10" fill="#DDE61F"/>
+  </g>
+
+  <!-- App Name -->
+  <text x="380" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#D6D7D5">
+    Odin Wallet
+  </text>
+
+  <!-- Tagline -->
+  <text x="380" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="#D6D7D5" opacity="0.7">
+    Personal finance management made simple
+  </text>
+
+  <!-- Features -->
+  <g transform="translate(380, 400)">
+    <circle cx="12" cy="12" r="8" fill="#DDE61F"/>
+    <text x="35" y="18" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#D6D7D5" opacity="0.8">Track accounts</text>
+
+    <circle cx="262" cy="12" r="8" fill="#DDE61F"/>
+    <text x="285" y="18" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#D6D7D5" opacity="0.8">Manage expenses</text>
+
+    <circle cx="512" cy="12" r="8" fill="#DDE61F"/>
+    <text x="535" y="18" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#D6D7D5" opacity="0.8">Build wealth</text>
+  </g>
+
+  <!-- Gradients -->
+  <defs>
+    <radialGradient id="grad1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(100 100) scale(300)">
+      <stop offset="0%" stop-color="#DDE61F"/>
+      <stop offset="100%" stop-color="#0F1822"/>
+    </radialGradient>
+    <radialGradient id="grad2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1100 530) scale(250)">
+      <stop offset="0%" stop-color="#1A5632"/>
+      <stop offset="100%" stop-color="#0F1822"/>
+    </radialGradient>
+  </defs>
+</svg>
