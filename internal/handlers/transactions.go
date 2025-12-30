@@ -5,18 +5,21 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kengru/odin-wallet/internal/middleware"
 	"github.com/kengru/odin-wallet/internal/models"
+	"github.com/kengru/odin-wallet/internal/services"
 )
 
 type TransactionHandler struct {
-	db *sql.DB
+	db              *sql.DB
+	exchangeService *services.ExchangeService
 }
 
-func NewTransactionHandler(db *sql.DB) *TransactionHandler {
-	return &TransactionHandler{db: db}
+func NewTransactionHandler(db *sql.DB, exchangeService *services.ExchangeService) *TransactionHandler {
+	return &TransactionHandler{db: db, exchangeService: exchangeService}
 }
 
 func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +256,11 @@ func (h *TransactionHandler) Recent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(`
-		SELECT t.id, t.account_id, t.type, t.amount, t.description, t.category, t.balance_after, t.created_at
+		SELECT t.id, t.account_id, t.type, t.amount, t.description, t.category, t.balance_after,
+		       t.linked_transaction_id, t.created_at,
+		       COALESCE((SELECT a2.name FROM transactions t2
+		                 JOIN accounts a2 ON t2.account_id = a2.id
+		                 WHERE t2.id = t.linked_transaction_id), '') as linked_account_name
 		FROM transactions t
 		JOIN accounts a ON t.account_id = a.id
 		WHERE a.user_id = ?
@@ -269,16 +276,275 @@ func (h *TransactionHandler) Recent(w http.ResponseWriter, r *http.Request) {
 	transactions := []models.Transaction{}
 	for rows.Next() {
 		var t models.Transaction
+		var linkedID sql.NullInt64
+		var linkedName string
 		err := rows.Scan(
 			&t.ID, &t.AccountID, &t.Type,
 			&t.Amount, &t.Description, &t.Category,
-			&t.BalanceAfter, &t.CreatedAt,
+			&t.BalanceAfter, &linkedID, &t.CreatedAt, &linkedName,
 		)
 		if err != nil {
 			continue
+		}
+		if linkedID.Valid {
+			t.LinkedTransactionID = &linkedID.Int64
+			t.LinkedAccountName = linkedName
 		}
 		transactions = append(transactions, t)
 	}
 
 	jsonResponse(w, transactions, http.StatusOK)
+}
+
+// Transfer handles inter-account transfers
+func (h *TransactionHandler) Transfer(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	var req models.TransferRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate amount
+	if req.Amount <= 0 {
+		jsonError(w, "Amount must be positive", http.StatusBadRequest)
+		return
+	}
+
+	if req.FromAccountID == req.ToAccountID {
+		jsonError(w, "Cannot transfer to the same account", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch both accounts
+	type accountInfo struct {
+		ID             int64
+		Name           string
+		Type           models.AccountType
+		Currency       string
+		CurrentBalance float64
+		CreditOwed     sql.NullFloat64
+		LoanOwed       sql.NullFloat64
+	}
+
+	var fromAccount, toAccount accountInfo
+
+	err := h.db.QueryRow(`
+		SELECT id, name, type, currency, current_balance, credit_owed, loan_current_owed
+		FROM accounts WHERE id = ? AND user_id = ?
+	`, req.FromAccountID, userID).Scan(
+		&fromAccount.ID, &fromAccount.Name, &fromAccount.Type, &fromAccount.Currency,
+		&fromAccount.CurrentBalance, &fromAccount.CreditOwed, &fromAccount.LoanOwed,
+	)
+	if err == sql.ErrNoRows {
+		jsonError(w, "Source account not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		jsonError(w, "Failed to fetch source account", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.db.QueryRow(`
+		SELECT id, name, type, currency, current_balance, credit_owed, loan_current_owed
+		FROM accounts WHERE id = ? AND user_id = ?
+	`, req.ToAccountID, userID).Scan(
+		&toAccount.ID, &toAccount.Name, &toAccount.Type, &toAccount.Currency,
+		&toAccount.CurrentBalance, &toAccount.CreditOwed, &toAccount.LoanOwed,
+	)
+	if err == sql.ErrNoRows {
+		jsonError(w, "Destination account not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		jsonError(w, "Failed to fetch destination account", http.StatusInternalServerError)
+		return
+	}
+
+	// Validate transfer direction
+	// Source must be an asset account
+	assetTypes := map[models.AccountType]bool{
+		models.AccountTypeCash:       true,
+		models.AccountTypeDebit:      true,
+		models.AccountTypeSaving:     true,
+		models.AccountTypeInvestment: true,
+	}
+	if !assetTypes[fromAccount.Type] {
+		jsonError(w, "Can only transfer from asset accounts (cash, debit, savings, investment)", http.StatusBadRequest)
+		return
+	}
+
+	// Destination can be asset or liability
+	validDestTypes := map[models.AccountType]bool{
+		models.AccountTypeCash:       true,
+		models.AccountTypeDebit:      true,
+		models.AccountTypeSaving:     true,
+		models.AccountTypeInvestment: true,
+		models.AccountTypeCreditCard: true,
+		models.AccountTypeLoan:       true,
+	}
+	if !validDestTypes[toAccount.Type] {
+		jsonError(w, "Invalid destination account type", http.StatusBadRequest)
+		return
+	}
+
+	// Handle currency conversion
+	fromAmount := req.Amount
+	toAmount := req.Amount
+
+	if fromAccount.Currency != toAccount.Currency {
+		convertedAmount, err := h.exchangeService.Convert(req.Amount, fromAccount.Currency, toAccount.Currency)
+		if err != nil {
+			jsonError(w, "Failed to convert currency: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		toAmount = convertedAmount
+	}
+
+	// Calculate new balances
+	fromNewBalance := fromAccount.CurrentBalance - fromAmount
+
+	var toNewBalance float64
+	var toUpdateQuery string
+
+	switch toAccount.Type {
+	case models.AccountTypeCash, models.AccountTypeDebit, models.AccountTypeSaving, models.AccountTypeInvestment:
+		toNewBalance = toAccount.CurrentBalance + toAmount
+		toUpdateQuery = "UPDATE accounts SET current_balance = ?, updated_at = ? WHERE id = ?"
+	case models.AccountTypeCreditCard:
+		owed := float64(0)
+		if toAccount.CreditOwed.Valid {
+			owed = toAccount.CreditOwed.Float64
+		}
+		toNewBalance = owed - toAmount // Payment reduces owed
+		toUpdateQuery = "UPDATE accounts SET credit_owed = ?, updated_at = ? WHERE id = ?"
+	case models.AccountTypeLoan:
+		owed := float64(0)
+		if toAccount.LoanOwed.Valid {
+			owed = toAccount.LoanOwed.Float64
+		}
+		toNewBalance = owed - toAmount // Payment reduces owed
+		toUpdateQuery = "UPDATE accounts SET loan_current_owed = ?, updated_at = ? WHERE id = ?"
+	}
+
+	// Start database transaction
+	tx, err := h.db.Begin()
+	if err != nil {
+		jsonError(w, "Failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	now := time.Now()
+
+	// Update source account (withdrawal)
+	_, err = tx.Exec("UPDATE accounts SET current_balance = ?, updated_at = ? WHERE id = ?",
+		fromNewBalance, now, fromAccount.ID)
+	if err != nil {
+		jsonError(w, "Failed to update source account", http.StatusInternalServerError)
+		return
+	}
+
+	// Update destination account
+	_, err = tx.Exec(toUpdateQuery, toNewBalance, now, toAccount.ID)
+	if err != nil {
+		jsonError(w, "Failed to update destination account", http.StatusInternalServerError)
+		return
+	}
+
+	// Create description with account names
+	description := req.Description
+	if description == "" {
+		description = "Transfer"
+	}
+	fromDescription := description + " → " + toAccount.Name
+	toDescription := description + " ← " + fromAccount.Name
+
+	// Determine transaction types
+	fromTxType := models.TransactionTypeWithdrawal
+	var toTxType models.TransactionType
+	switch toAccount.Type {
+	case models.AccountTypeCash, models.AccountTypeDebit, models.AccountTypeSaving, models.AccountTypeInvestment:
+		toTxType = models.TransactionTypeDeposit
+	case models.AccountTypeCreditCard, models.AccountTypeLoan:
+		toTxType = models.TransactionTypePayment
+	}
+
+	// Insert withdrawal transaction (source)
+	result1, err := tx.Exec(`
+		INSERT INTO transactions (account_id, type, amount, description, category, balance_after, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, fromAccount.ID, string(fromTxType), fromAmount, fromDescription, string(models.CategoryTransfer), fromNewBalance, now)
+	if err != nil {
+		jsonError(w, "Failed to create source transaction", http.StatusInternalServerError)
+		return
+	}
+	fromTxID, _ := result1.LastInsertId()
+
+	// Insert deposit/payment transaction (destination)
+	result2, err := tx.Exec(`
+		INSERT INTO transactions (account_id, type, amount, description, category, balance_after, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, toAccount.ID, string(toTxType), toAmount, toDescription, string(models.CategoryTransfer), toNewBalance, now)
+	if err != nil {
+		jsonError(w, "Failed to create destination transaction", http.StatusInternalServerError)
+		return
+	}
+	toTxID, _ := result2.LastInsertId()
+
+	// Link transactions
+	_, err = tx.Exec("UPDATE transactions SET linked_transaction_id = ? WHERE id = ?", toTxID, fromTxID)
+	if err != nil {
+		jsonError(w, "Failed to link transactions", http.StatusInternalServerError)
+		return
+	}
+	_, err = tx.Exec("UPDATE transactions SET linked_transaction_id = ? WHERE id = ?", fromTxID, toTxID)
+	if err != nil {
+		jsonError(w, "Failed to link transactions", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		jsonError(w, "Failed to commit transaction", http.StatusInternalServerError)
+		return
+	}
+
+	// Return the source transaction (withdrawal)
+	response := models.Transaction{
+		ID:                  fromTxID,
+		AccountID:           fromAccount.ID,
+		Type:                fromTxType,
+		Amount:              fromAmount,
+		Description:         fromDescription,
+		Category:            models.CategoryTransfer,
+		BalanceAfter:        fromNewBalance,
+		LinkedTransactionID: &toTxID,
+		LinkedAccountName:   toAccount.Name,
+		CreatedAt:           now,
+	}
+
+	// Include converted amount info if cross-currency
+	if fromAccount.Currency != toAccount.Currency {
+		jsonResponse(w, map[string]interface{}{
+			"transaction":      response,
+			"converted_amount": toAmount,
+			"to_currency":      toAccount.Currency,
+		}, http.StatusCreated)
+		return
+	}
+
+	jsonResponse(w, response, http.StatusCreated)
+}
+
+// Helper to get account type from string
+func (h *TransactionHandler) isAssetAccount(accountType models.AccountType) bool {
+	return accountType == models.AccountTypeCash ||
+		accountType == models.AccountTypeDebit ||
+		accountType == models.AccountTypeSaving ||
+		accountType == models.AccountTypeInvestment
 }

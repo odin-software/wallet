@@ -136,9 +136,10 @@ export function CreateAccountModal({
 
   const renderStep1 = () => (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
       className="space-y-4"
     >
       <p className="text-quaternary/60 text-sm mb-6">
@@ -181,9 +182,10 @@ export function CreateAccountModal({
 
   const renderStep2 = () => (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
       className="space-y-5"
     >
       <Input
@@ -350,9 +352,10 @@ export function CreateAccountModal({
 
     return (
       <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -20 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
         className="space-y-5"
       >
         <p className="text-quaternary/60 text-sm">

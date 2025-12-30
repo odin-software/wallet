@@ -50,7 +50,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(db, sessionSecret)
 	accountHandler := handlers.NewAccountHandler(db, exchangeService)
-	transactionHandler := handlers.NewTransactionHandler(db)
+	transactionHandler := handlers.NewTransactionHandler(db, exchangeService)
 	exchangeHandler := handlers.NewExchangeHandler(exchangeService)
 	reportHandler := handlers.NewReportHandler(db, exchangeService)
 
@@ -98,6 +98,9 @@ func main() {
 
 			// Recent transactions across all accounts
 			r.Get("/transactions/recent", transactionHandler.Recent)
+
+			// Transfers
+			r.Post("/transfers", transactionHandler.Transfer)
 
 			// Exchange rates
 			r.Get("/exchange-rates", exchangeHandler.GetRates)

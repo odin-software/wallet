@@ -121,6 +121,7 @@ func migrate(db *sql.DB) error {
 	}{
 		{"users", "name", "ALTER TABLE users ADD COLUMN name TEXT"},
 		{"users", "preferred_currency", "ALTER TABLE users ADD COLUMN preferred_currency TEXT DEFAULT 'DOP'"},
+		{"transactions", "linked_transaction_id", "ALTER TABLE transactions ADD COLUMN linked_transaction_id INTEGER REFERENCES transactions(id)"},
 	}
 
 	for _, m := range alterMigrations {

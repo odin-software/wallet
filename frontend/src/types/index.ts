@@ -104,6 +104,8 @@ export interface Transaction {
   description: string;
   category: TransactionCategory;
   balance_after: number;
+  linked_transaction_id?: number;
+  linked_account_name?: string;
   created_at: string;
 }
 
@@ -112,6 +114,19 @@ export interface CreateTransactionRequest {
   amount: number;
   description: string;
   category: TransactionCategory;
+}
+
+export interface TransferRequest {
+  from_account_id: number;
+  to_account_id: number;
+  amount: number;
+  description?: string;
+}
+
+export interface TransferResponse {
+  transaction: Transaction;
+  converted_amount?: number;
+  to_currency?: string;
 }
 
 export interface TransactionListResponse {

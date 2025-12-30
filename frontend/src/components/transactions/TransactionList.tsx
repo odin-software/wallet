@@ -146,6 +146,13 @@ export function TransactionList({
                       </p>
                       <p className="text-sm text-quaternary/50">
                         {formatTime(tx.created_at)} · {tx.type}
+                        {tx.category === "transfer" &&
+                          tx.linked_account_name && (
+                            <span className="text-primary">
+                              {" "}
+                              → {tx.linked_account_name}
+                            </span>
+                          )}
                       </p>
                     </div>
 

@@ -84,14 +84,16 @@ var CategoryLabels = map[TransactionCategory]string{
 
 // Transaction represents a financial transaction
 type Transaction struct {
-	ID           int64               `json:"id"`
-	AccountID    int64               `json:"account_id"`
-	Type         TransactionType     `json:"type"`
-	Amount       float64             `json:"amount"`
-	Description  string              `json:"description"`
-	Category     TransactionCategory `json:"category"`
-	BalanceAfter float64             `json:"balance_after"`
-	CreatedAt    time.Time           `json:"created_at"`
+	ID                  int64               `json:"id"`
+	AccountID           int64               `json:"account_id"`
+	Type                TransactionType     `json:"type"`
+	Amount              float64             `json:"amount"`
+	Description         string              `json:"description"`
+	Category            TransactionCategory `json:"category"`
+	BalanceAfter        float64             `json:"balance_after"`
+	LinkedTransactionID *int64              `json:"linked_transaction_id,omitempty"`
+	LinkedAccountName   string              `json:"linked_account_name,omitempty"`
+	CreatedAt           time.Time           `json:"created_at"`
 }
 
 // CreateTransactionRequest represents the request to create a transaction
@@ -100,6 +102,14 @@ type CreateTransactionRequest struct {
 	Amount      float64             `json:"amount"`
 	Description string              `json:"description"`
 	Category    TransactionCategory `json:"category"`
+}
+
+// TransferRequest represents the request to create a transfer between accounts
+type TransferRequest struct {
+	FromAccountID int64   `json:"from_account_id"`
+	ToAccountID   int64   `json:"to_account_id"`
+	Amount        float64 `json:"amount"`
+	Description   string  `json:"description"`
 }
 
 // TransactionListResponse represents paginated transaction list

@@ -11,6 +11,8 @@ import type {
   UpdatePreferencesRequest,
   ReportResponse,
   ReportPeriod,
+  TransferRequest,
+  TransferResponse,
 } from "../types";
 
 const API_BASE = "/api";
@@ -132,6 +134,15 @@ export const transactions = {
 
   recent: (limit = 10): Promise<Transaction[]> =>
     request(`/transactions/recent?limit=${limit}`),
+};
+
+// Transfers API
+export const transfers = {
+  create: (data: TransferRequest): Promise<Transaction | TransferResponse> =>
+    request("/transfers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
 // Exchange Rates API

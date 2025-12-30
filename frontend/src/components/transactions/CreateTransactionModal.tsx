@@ -23,7 +23,11 @@ import {
   Check,
 } from "lucide-react";
 import { BottomSheet, Button, Input } from "../ui";
-import { transactions as transactionsApi } from "../../api/client";
+import {
+  transactions as transactionsApi,
+  transfers as transfersApi,
+  exchangeRates as exchangeApi,
+} from "../../api/client";
 import type {
   Account,
   Transaction,
@@ -40,6 +44,8 @@ interface CreateTransactionModalProps {
   preselectedAccountId?: number;
   onCreated: (transaction: Transaction) => void;
 }
+
+type TransactionMode = "regular" | "transfer";
 
 const categoryIcons: Record<TransactionCategory, React.ElementType> = {
   groceries: ShoppingCart,
@@ -69,9 +75,13 @@ export function CreateTransactionModal({
   preselectedAccountId,
   onCreated,
 }: CreateTransactionModalProps) {
+  const [mode, setMode] = useState<TransactionMode>("regular");
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
     preselectedAccountId || null
   );
+  const [destinationAccountId, setDestinationAccountId] = useState<
+    number | null
+  >(null);
   const [transactionType, setTransactionType] =
     useState<TransactionType | null>(null);
   const [amount, setAmount] = useState("");
@@ -79,16 +89,35 @@ export function CreateTransactionModal({
   const [category, setCategory] = useState<TransactionCategory>("other");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
+  const destinationAccount = accounts.find(
+    (a) => a.id === destinationAccountId
+  );
   const currency = selectedAccount
     ? CURRENCIES.find((c) => c.code === selectedAccount.currency)
     : null;
   const symbol = currency?.symbol || "$";
 
+  // Get destination currency info
+  const destCurrency = destinationAccount
+    ? CURRENCIES.find((c) => c.code === destinationAccount.currency)
+    : null;
+  const destSymbol = destCurrency?.symbol || "$";
+
+  // Check if cross-currency transfer
+  const isCrossCurrency =
+    mode === "transfer" &&
+    selectedAccount &&
+    destinationAccount &&
+    selectedAccount.currency !== destinationAccount.currency;
+
   // Reset transaction type when account changes
   useEffect(() => {
     setTransactionType(null);
+    setDestinationAccountId(null);
+    setConvertedAmount(null);
   }, [selectedAccountId]);
 
   // Update preselected account when prop changes
@@ -97,6 +126,41 @@ export function CreateTransactionModal({
       setSelectedAccountId(preselectedAccountId);
     }
   }, [preselectedAccountId]);
+
+  // Fetch converted amount for cross-currency transfers
+  useEffect(() => {
+    if (isCrossCurrency && amount && selectedAccount && destinationAccount) {
+      const amountNum = parseFloat(amount);
+      if (!isNaN(amountNum) && amountNum > 0) {
+        exchangeApi
+          .convert(
+            selectedAccount.currency,
+            destinationAccount.currency,
+            amountNum
+          )
+          .then((result) => {
+            setConvertedAmount(result.converted);
+          })
+          .catch(() => {
+            setConvertedAmount(null);
+          });
+      }
+    } else {
+      setConvertedAmount(null);
+    }
+  }, [isCrossCurrency, amount, selectedAccount, destinationAccount]);
+
+  // Filter accounts for transfer destination
+  const getDestinationAccounts = () => {
+    if (!selectedAccount) return [];
+    // Source must be asset, destination can be anything except same account
+    return accounts.filter((a) => a.id !== selectedAccountId);
+  };
+
+  // Check if account is asset type
+  const isAssetAccount = (account: Account) => {
+    return ["cash", "debit", "saving", "investment"].includes(account.type);
+  };
 
   // Determine available transaction types based on account type
   const getAvailableTypes = (): {
@@ -128,16 +192,23 @@ export function CreateTransactionModal({
   };
 
   const availableTypes = getAvailableTypes();
+  const destinationAccounts = getDestinationAccounts();
+
+  // Only show transfer option if source is asset account
+  const canTransfer = selectedAccount && isAssetAccount(selectedAccount);
 
   const resetForm = () => {
     if (!preselectedAccountId) {
       setSelectedAccountId(null);
     }
+    setMode("regular");
+    setDestinationAccountId(null);
     setTransactionType(null);
     setAmount("");
     setDescription("");
     setCategory("other");
     setError(null);
+    setConvertedAmount(null);
   };
 
   const handleClose = () => {
@@ -146,7 +217,10 @@ export function CreateTransactionModal({
   };
 
   const getPreviewBalance = () => {
-    if (!selectedAccount || !amount || !transactionType) return null;
+    if (!selectedAccount || !amount) return null;
+    if (mode === "transfer" && !destinationAccountId) return null;
+    if (mode === "regular" && !transactionType) return null;
+
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum)) return null;
 
@@ -160,6 +234,11 @@ export function CreateTransactionModal({
         break;
       default:
         currentBalance = selectedAccount.current_balance;
+    }
+
+    if (mode === "transfer") {
+      // Transfer always withdraws from source
+      return currentBalance - amountNum;
     }
 
     switch (transactionType) {
@@ -177,7 +256,7 @@ export function CreateTransactionModal({
   };
 
   const handleSubmit = async () => {
-    if (!selectedAccount || !transactionType || !amount) return;
+    if (!selectedAccount || !amount) return;
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -189,18 +268,42 @@ export function CreateTransactionModal({
     setError(null);
 
     try {
-      const data: CreateTransactionRequest = {
-        type: transactionType,
-        amount: amountNum,
-        description,
-        category,
-      };
+      if (mode === "transfer") {
+        if (!destinationAccountId) {
+          setError("Please select a destination account");
+          return;
+        }
 
-      const transaction = await transactionsApi.create(
-        selectedAccount.id,
-        data
-      );
-      onCreated(transaction);
+        const result = await transfersApi.create({
+          from_account_id: selectedAccount.id,
+          to_account_id: destinationAccountId,
+          amount: amountNum,
+          description: description || undefined,
+        });
+
+        // Handle response - it might be Transaction or TransferResponse
+        const transaction =
+          "transaction" in result ? result.transaction : result;
+        onCreated(transaction as Transaction);
+      } else {
+        if (!transactionType) {
+          setError("Please select a transaction type");
+          return;
+        }
+
+        const data: CreateTransactionRequest = {
+          type: transactionType,
+          amount: amountNum,
+          description,
+          category,
+        };
+
+        const transaction = await transactionsApi.create(
+          selectedAccount.id,
+          data
+        );
+        onCreated(transaction);
+      }
       handleClose();
     } catch (err) {
       setError(
@@ -219,7 +322,7 @@ export function CreateTransactionModal({
         {/* Account Selector - Inline list for mobile */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-quaternary/80">
-            Select Account
+            {mode === "transfer" ? "From Account" : "Select Account"}
           </label>
           <div className="grid gap-2 max-h-48 overflow-y-auto">
             {accounts.map((account) => {
@@ -234,6 +337,11 @@ export function CreateTransactionModal({
                   : account.type === "loan"
                   ? account.loan_current_owed || 0
                   : account.current_balance;
+
+              // For transfer mode, only show asset accounts as source
+              if (mode === "transfer" && !isAssetAccount(account)) {
+                return null;
+              }
 
               return (
                 <button
@@ -275,8 +383,125 @@ export function CreateTransactionModal({
           </div>
         </div>
 
-        {/* Transaction Type Toggle - only show when account is selected */}
-        {selectedAccount && availableTypes.length > 0 && (
+        {/* Mode Toggle - only show when account is selected and is asset */}
+        {selectedAccount && canTransfer && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-quaternary/80">
+              Transaction Mode
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setMode("regular");
+                  setDestinationAccountId(null);
+                }}
+                className={`flex-1 p-3 rounded-xl border-2 transition-all ${
+                  mode === "regular"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-quaternary/30"
+                }`}
+              >
+                <p
+                  className={`text-sm font-medium ${
+                    mode === "regular" ? "text-primary" : "text-quaternary/60"
+                  }`}
+                >
+                  Regular
+                </p>
+              </button>
+              <button
+                onClick={() => {
+                  setMode("transfer");
+                  setTransactionType(null);
+                }}
+                className={`flex-1 p-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
+                  mode === "transfer"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-quaternary/30"
+                }`}
+              >
+                <ArrowLeftRight
+                  className={`w-4 h-4 ${
+                    mode === "transfer" ? "text-primary" : "text-quaternary/60"
+                  }`}
+                />
+                <p
+                  className={`text-sm font-medium ${
+                    mode === "transfer" ? "text-primary" : "text-quaternary/60"
+                  }`}
+                >
+                  Transfer
+                </p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Destination Account Selector - for transfer mode */}
+        {mode === "transfer" && selectedAccount && (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-quaternary/80">
+              To Account
+            </label>
+            <div className="grid gap-2 max-h-48 overflow-y-auto">
+              {destinationAccounts.map((account) => {
+                const isSelected = account.id === destinationAccountId;
+                const accountCurrency = CURRENCIES.find(
+                  (c) => c.code === account.currency
+                );
+                const accountSymbol = accountCurrency?.symbol || "$";
+                const balance =
+                  account.type === "credit_card"
+                    ? account.credit_owed || 0
+                    : account.type === "loan"
+                    ? account.loan_current_owed || 0
+                    : account.current_balance;
+                const isLiability = !ACCOUNT_TYPES[account.type].isAsset;
+
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => setDestinationAccountId(account.id)}
+                    className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${
+                      isSelected
+                        ? "bg-primary/15 border-2 border-primary"
+                        : "bg-card border-2 border-border hover:border-quaternary/30 active:scale-[0.98]"
+                    }`}
+                  >
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: account.color }}
+                    />
+                    <div className="flex-1 text-left min-w-0">
+                      <p
+                        className={`font-medium truncate ${
+                          isSelected ? "text-primary" : "text-quaternary"
+                        }`}
+                      >
+                        {account.name}
+                      </p>
+                      <p className="text-sm text-quaternary/50">
+                        {ACCOUNT_TYPES[account.type].label}
+                        {isLiability ? " (Payment)" : ""} · {accountSymbol}
+                        {balance.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <Check className="w-5 h-5 text-primary flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Transaction Type Toggle - only show for regular mode */}
+        {mode === "regular" && selectedAccount && availableTypes.length > 0 && (
           <div className="space-y-2">
             <label className="block text-sm font-medium text-quaternary/80">
               Type
@@ -321,8 +546,9 @@ export function CreateTransactionModal({
           </div>
         )}
 
-        {/* Amount Input - only show when type is selected */}
-        {transactionType && (
+        {/* Amount Input - show when ready */}
+        {((mode === "regular" && transactionType) ||
+          (mode === "transfer" && destinationAccountId)) && (
           <>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-quaternary/80">
@@ -342,15 +568,33 @@ export function CreateTransactionModal({
                   className="w-full pl-16 pr-4 py-4 text-2xl font-semibold rounded-xl bg-card border border-border text-quaternary focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 />
               </div>
+
+              {/* Cross-currency conversion preview */}
+              {isCrossCurrency && convertedAmount !== null && (
+                <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+                  <p className="text-sm text-quaternary">
+                    Destination will receive:{" "}
+                    <span className="font-semibold text-primary">
+                      {destSymbol}
+                      {convertedAmount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </p>
+                </div>
+              )}
+
               {previewBalance !== null && (
                 <p className="text-sm text-quaternary/50">
                   New balance:{" "}
                   <span
                     className={`font-medium ${
-                      transactionType === "deposit" ||
-                      transactionType === "payment"
-                        ? "text-success"
-                        : "text-danger"
+                      mode === "transfer" ||
+                      transactionType === "withdrawal" ||
+                      transactionType === "expense"
+                        ? "text-danger"
+                        : "text-success"
                     }`}
                   >
                     {symbol}
@@ -363,20 +607,21 @@ export function CreateTransactionModal({
               )}
             </div>
 
-            {/* Category Selector */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-quaternary/80">
-                Category
-              </label>
-              <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto py-1">
-                {(Object.keys(CATEGORIES) as TransactionCategory[]).map(
-                  (cat) => {
-                    const Icon = categoryIcons[cat];
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => setCategory(cat)}
-                        className={`
+            {/* Category Selector - only for regular mode */}
+            {mode === "regular" && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-quaternary/80">
+                  Category
+                </label>
+                <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto py-1">
+                  {(Object.keys(CATEGORIES) as TransactionCategory[]).map(
+                    (cat) => {
+                      const Icon = categoryIcons[cat];
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => setCategory(cat)}
+                          className={`
                         p-2 rounded-xl transition-all flex flex-col items-center gap-1
                         ${
                           category === cat
@@ -384,36 +629,42 @@ export function CreateTransactionModal({
                             : "bg-card border border-border hover:border-quaternary/30"
                         }
                       `}
-                      >
-                        <Icon
-                          className={`w-5 h-5 ${
-                            category === cat
-                              ? "text-primary"
-                              : "text-quaternary/60"
-                          }`}
-                        />
-                        <span
-                          className={`text-[10px] ${
-                            category === cat
-                              ? "text-primary font-medium"
-                              : "text-quaternary/50"
-                          }`}
                         >
-                          {CATEGORIES[cat].label}
-                        </span>
-                      </button>
-                    );
-                  }
-                )}
+                          <Icon
+                            className={`w-5 h-5 ${
+                              category === cat
+                                ? "text-primary"
+                                : "text-quaternary/60"
+                            }`}
+                          />
+                          <span
+                            className={`text-[10px] ${
+                              category === cat
+                                ? "text-primary font-medium"
+                                : "text-quaternary/50"
+                            }`}
+                          >
+                            {CATEGORIES[cat].label}
+                          </span>
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Description */}
             <Input
               label="Description (optional)"
-              placeholder="e.g., Grocery shopping at Costco"
+              placeholder={
+                mode === "transfer"
+                  ? "e.g., Monthly savings"
+                  : "e.g., Grocery shopping at Costco"
+              }
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              autoComplete="off"
             />
           </>
         )}
@@ -429,11 +680,16 @@ export function CreateTransactionModal({
         <Button
           onClick={handleSubmit}
           isLoading={isLoading}
-          disabled={!selectedAccount || !transactionType || !amount}
+          disabled={
+            !selectedAccount ||
+            !amount ||
+            (mode === "regular" && !transactionType) ||
+            (mode === "transfer" && !destinationAccountId)
+          }
           className="w-full"
           size="lg"
         >
-          Add Transaction
+          {mode === "transfer" ? "Transfer" : "Add Transaction"}
         </Button>
       </div>
     </BottomSheet>
