@@ -86,6 +86,7 @@ func main() {
 				r.Get("/{id}", accountHandler.Get)
 				r.Put("/{id}", accountHandler.Update)
 				r.Delete("/{id}", accountHandler.Delete)
+				r.Post("/{id}/adjust-balance", accountHandler.AdjustBalance)
 
 				// Transaction routes nested under accounts
 				r.Get("/{id}/transactions", transactionHandler.ListByAccount)

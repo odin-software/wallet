@@ -12,6 +12,7 @@ import {
   TrendingUp,
   ArrowUpCircle,
   ArrowDownCircle,
+  Edit3,
 } from "lucide-react";
 import {
   accounts as accountsApi,
@@ -20,6 +21,7 @@ import {
 import { Button, Card, Modal } from "../components/ui";
 import { CreateTransactionModal } from "../components/transactions/CreateTransactionModal";
 import { TransactionList } from "../components/transactions/TransactionList";
+import { EditAccountModal } from "../components/accounts/EditAccountModal";
 import type { Account, Transaction, TransactionListResponse } from "../types";
 import { ACCOUNT_TYPES, CURRENCIES } from "../types";
 
@@ -42,6 +44,7 @@ export function AccountDetail() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const accountId = parseInt(id || "0");
@@ -168,12 +171,20 @@ export function AccountDetail() {
               <ChevronLeft className="w-5 h-5" />
               <span>Back</span>
             </Link>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="p-2 rounded-lg text-quaternary/60 hover:text-danger hover:bg-danger/10 transition-colors"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="p-2 rounded-lg text-quaternary/60 hover:text-primary hover:bg-primary/10 transition-colors"
+              >
+                <Edit3 className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="p-2 rounded-lg text-quaternary/60 hover:text-danger hover:bg-danger/10 transition-colors"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Account info */}
@@ -389,6 +400,20 @@ export function AccountDetail() {
         preselectedAccountId={account.id}
         onCreated={handleTransactionCreated}
       />
+
+      {/* Edit Account Modal */}
+      {account && (
+        <EditAccountModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          account={account}
+          onUpdated={(updatedAccount) => {
+            setAccount(updatedAccount);
+            // Refresh transactions in case balance adjustment created one
+            fetchTransactions(1);
+          }}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <Modal

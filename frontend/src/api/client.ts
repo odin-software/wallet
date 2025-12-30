@@ -97,6 +97,16 @@ export const accounts = {
   delete: (id: number): Promise<{ message: string }> =>
     request(`/accounts/${id}`, { method: "DELETE" }),
 
+  adjustBalance: (
+    id: number,
+    amount: number,
+    description?: string
+  ): Promise<Account> =>
+    request(`/accounts/${id}/adjust-balance`, {
+      method: "POST",
+      body: JSON.stringify({ amount, description }),
+    }),
+
   overview: (): Promise<FinancialOverview> => request("/overview"),
 };
 

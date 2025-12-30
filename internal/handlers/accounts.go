@@ -340,6 +340,129 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]string{"message": "Account deleted successfully"}, http.StatusOK)
 }
 
+type AdjustBalanceRequest struct {
+	Amount      float64 `json:"amount"`      // Positive or negative adjustment
+	Description string  `json:"description"` // Optional description
+}
+
+func (h *AccountHandler) AdjustBalance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		jsonError(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	accountID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		jsonError(w, "Invalid account ID", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch account to verify ownership and type
+	account, err := h.getAccountByID(accountID, userID)
+	if err == sql.ErrNoRows {
+		jsonError(w, "Account not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		jsonError(w, "Failed to fetch account", http.StatusInternalServerError)
+		return
+	}
+
+	// Only allow balance adjustment for asset accounts
+	assetTypes := []models.AccountType{
+		models.AccountTypeCash,
+		models.AccountTypeDebit,
+		models.AccountTypeSaving,
+		models.AccountTypeInvestment,
+	}
+	isAsset := false
+	for _, t := range assetTypes {
+		if t == account.Type {
+			isAsset = true
+			break
+		}
+	}
+	if !isAsset {
+		jsonError(w, "Balance adjustment only allowed for cash, debit, savings, and investment accounts", http.StatusBadRequest)
+		return
+	}
+
+	var req AdjustBalanceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Amount == 0 {
+		jsonError(w, "Adjustment amount cannot be zero", http.StatusBadRequest)
+		return
+	}
+
+	// Start transaction
+	tx, err := h.db.Begin()
+	if err != nil {
+		jsonError(w, "Failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	// Calculate new balance
+	newBalance := account.CurrentBalance + req.Amount
+
+	// Determine transaction type
+	txType := "deposit"
+	if req.Amount < 0 {
+		txType = "withdrawal"
+	}
+
+	// Create description if not provided
+	description := req.Description
+	if description == "" {
+		description = "Balance adjustment"
+	}
+
+	// Insert adjustment transaction
+	_, err = tx.Exec(`
+		INSERT INTO transactions (account_id, type, amount, description, category, balance_after, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, accountID, txType, abs(req.Amount), description, "transfer", newBalance, time.Now())
+	if err != nil {
+		jsonError(w, "Failed to create adjustment transaction", http.StatusInternalServerError)
+		return
+	}
+
+	// Update account balance
+	_, err = tx.Exec(`
+		UPDATE accounts SET current_balance = ?, updated_at = ? WHERE id = ?
+	`, newBalance, time.Now(), accountID)
+	if err != nil {
+		jsonError(w, "Failed to update account balance", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		jsonError(w, "Failed to commit transaction", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch and return updated account
+	updatedAccount, err := h.getAccountByID(accountID, userID)
+	if err != nil {
+		jsonError(w, "Balance adjusted but failed to fetch account", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, updatedAccount, http.StatusOK)
+}
+
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
 func (h *AccountHandler) Overview(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {

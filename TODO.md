@@ -1,0 +1,3 @@
+- Define the definitive colors for the accounts.
+- Define the definitive categories for the accounts.
+- Add budgetting, put a "spend limit" on categories.
