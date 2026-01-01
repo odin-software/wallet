@@ -75,7 +75,7 @@ export function AccountCard({ account }: AccountCardProps) {
       whileHover={{ y: -2, scale: 1.005 }}
       whileTap={{ scale: 0.995 }}
       transition={{ duration: 0.15 }}
-      className="relative overflow-hidden rounded-2xl bg-card border border-border p-5 cursor-pointer group"
+      className="relative overflow-hidden rounded-2xl bg-card border border-border p-5 md:p-5 cursor-pointer group"
       style={{
         borderColor: `${account.color}30`,
       }}
@@ -89,29 +89,29 @@ export function AccountCard({ account }: AccountCardProps) {
       />
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between mb-3 md:mb-4">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <div
-            className="p-2.5 rounded-xl"
+            className="p-2 md:p-2.5 rounded-xl flex-shrink-0"
             style={{ backgroundColor: `${account.color}15` }}
           >
-            <Icon className="w-5 h-5" style={{ color: account.color }} />
+            <Icon className="w-4 md:w-5 h-4 md:h-5" style={{ color: account.color }} />
           </div>
-          <div>
-            <h3 className="font-semibold text-quaternary">{account.name}</h3>
-            <p className="text-sm text-quaternary/60">{accountType.label}</p>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-quaternary text-sm md:text-base truncate">{account.name}</h3>
+            <p className="text-xs md:text-sm text-quaternary/60 truncate">{accountType.label}</p>
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-quaternary/30 group-hover:text-quaternary/60 group-hover:translate-x-1 transition-all" />
+        <ChevronRight className="w-4 md:w-5 h-4 md:h-5 text-quaternary/30 group-hover:text-quaternary/60 group-hover:translate-x-1 transition-all flex-shrink-0" />
       </div>
 
       {/* Balance */}
-      <div className="mb-3">
-        <p className="text-sm text-quaternary/60 mb-1">
+      <div className="mb-2 md:mb-3">
+        <p className="text-xs md:text-sm text-quaternary/60 mb-0.5 md:mb-1">
           {isLiability ? "Amount Owed" : "Balance"}
         </p>
         <p
-          className={`text-2xl font-bold ${
+          className={`text-lg md:text-2xl font-bold ${
             isLiability ? "text-danger" : "text-quaternary"
           }`}
         >
@@ -120,12 +120,12 @@ export function AccountCard({ account }: AccountCardProps) {
         </p>
       </div>
 
-      {/* Credit card utilization bar */}
+      {/* Credit card utilization bar - hide details on mobile */}
       {utilization !== null && (
-        <div className="mt-4">
-          <div className="flex justify-between text-xs text-quaternary/60 mb-1.5">
+        <div className="mt-3 md:mt-4">
+          <div className="flex justify-between text-xs text-quaternary/60 mb-1">
             <span>Credit Used</span>
-            <span>{utilization.toFixed(0)}%</span>
+            <span className="hidden md:inline">{utilization.toFixed(0)}%</span>
           </div>
           <div className="h-2 bg-border rounded-full overflow-hidden">
             <motion.div
@@ -141,19 +141,19 @@ export function AccountCard({ account }: AccountCardProps) {
               }`}
             />
           </div>
-          <p className="text-xs text-quaternary/50 mt-1.5">
+          <p className="text-xs text-quaternary/50 mt-1 hidden md:block">
             {formatCurrency(account.credit_owed || 0)} of{" "}
             {formatCurrency(account.credit_limit || 0)}
           </p>
         </div>
       )}
 
-      {/* Loan progress bar */}
+      {/* Loan progress bar - hide details on mobile */}
       {loanProgress !== null && (
-        <div className="mt-4">
-          <div className="flex justify-between text-xs text-quaternary/60 mb-1.5">
+        <div className="mt-3 md:mt-4">
+          <div className="flex justify-between text-xs text-quaternary/60 mb-1">
             <span>Paid Off</span>
-            <span>{loanProgress.toFixed(0)}%</span>
+            <span className="hidden md:inline">{loanProgress.toFixed(0)}%</span>
           </div>
           <div className="h-2 bg-border rounded-full overflow-hidden">
             <motion.div
@@ -164,25 +164,25 @@ export function AccountCard({ account }: AccountCardProps) {
             />
           </div>
           {account.monthly_payment && (
-            <p className="text-xs text-quaternary/50 mt-1.5">
+            <p className="text-xs text-quaternary/50 mt-1 hidden md:block">
               {formatCurrency(account.monthly_payment)}/month
             </p>
           )}
         </div>
       )}
 
-      {/* Interest rate badge for savings/investments */}
+      {/* Interest rate badge for savings/investments - hide on mobile */}
       {(account.type === "saving" || account.type === "investment") &&
         account.yearly_interest_rate && (
-          <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-success text-xs font-medium">
+          <div className="mt-2 md:mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-success text-xs font-medium hidden md:inline-flex">
             <TrendingUp className="w-3.5 h-3.5" />
             {account.yearly_interest_rate}% APY
           </div>
         )}
 
-      {/* Credit card closing date */}
+      {/* Credit card closing date - hide on mobile */}
       {account.type === "credit_card" && account.closing_date && (
-        <p className="text-xs text-quaternary/50 mt-2">
+        <p className="text-xs text-quaternary/50 mt-2 hidden md:block">
           Closes on day {account.closing_date}
         </p>
       )}

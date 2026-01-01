@@ -188,7 +188,7 @@ export function Dashboard() {
               variants={{
                 visible: { transition: { staggerChildren: 0.05 } },
               }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4"
             >
               <AnimatePresence mode="popLayout">
                 {accounts.map((account) => (
