@@ -95,11 +95,18 @@ export function AccountCard({ account }: AccountCardProps) {
             className="p-2 md:p-2.5 rounded-xl flex-shrink-0"
             style={{ backgroundColor: `${account.color}15` }}
           >
-            <Icon className="w-4 md:w-5 h-4 md:h-5" style={{ color: account.color }} />
+            <Icon
+              className="w-4 md:w-5 h-4 md:h-5"
+              style={{ color: account.color }}
+            />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-quaternary text-sm md:text-base truncate">{account.name}</h3>
-            <p className="text-xs md:text-sm text-quaternary/60 truncate">{accountType.label}</p>
+            <h3 className="font-semibold text-quaternary text-sm md:text-base truncate">
+              {account.name}
+            </h3>
+            <p className="text-xs md:text-sm text-quaternary/60 truncate">
+              {accountType.label}
+            </p>
           </div>
         </div>
         <ChevronRight className="w-4 md:w-5 h-4 md:h-5 text-quaternary/30 group-hover:text-quaternary/60 group-hover:translate-x-1 transition-all flex-shrink-0" />

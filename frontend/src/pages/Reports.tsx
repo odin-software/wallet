@@ -122,7 +122,7 @@ export function Reports() {
     };
 
     fetchReport();
-  }, [period, currentDate]);
+  }, [period, currentDate, getDateParam]);
 
   // Currency formatting
   const currencyInfo = CURRENCIES.find((c) => c.code === report?.currency);

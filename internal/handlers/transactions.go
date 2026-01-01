@@ -542,7 +542,7 @@ func (h *TransactionHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 }
 
 // Helper to get account type from string
-func (h *TransactionHandler) isAssetAccount(accountType models.AccountType) bool {
+func (h *TransactionHandler) IsAssetAccount(accountType models.AccountType) bool {
 	return accountType == models.AccountTypeCash ||
 		accountType == models.AccountTypeDebit ||
 		accountType == models.AccountTypeSaving ||

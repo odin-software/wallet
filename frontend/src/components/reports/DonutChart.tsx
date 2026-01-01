@@ -46,15 +46,22 @@ export function DonutChart({
     const entries = data
       .map((cat) => [cat.category, cat.amount] as [string, number])
       .sort((a, b) => b[1] - a[1]);
-    let currentAngle = 0;
     const radius = 80;
     const circumference = 2 * Math.PI * radius;
 
-    return entries.map(([category, amount]) => {
+    return entries.map(([category, amount], index) => {
       const percentage = total > 0 ? (amount / total) * 100 : 0;
+
+      // Calculate current angle based on all previous segments
+      const currentAngle = entries
+        .slice(0, index)
+        .reduce((sum, [, prevAmount]) => {
+          const prevPercentage = total > 0 ? (prevAmount / total) * 100 : 0;
+          return sum + (prevPercentage / 100) * 360;
+        }, 0);
+
       const strokeDasharray = (percentage / 100) * circumference;
       const strokeDashoffset = -currentAngle * (circumference / 360);
-      currentAngle += (percentage / 100) * 360;
 
       return {
         category,
