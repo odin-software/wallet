@@ -13,6 +13,7 @@ import type {
   ReportPeriod,
   TransferRequest,
   TransferResponse,
+  CategoryBudget,
 } from "../types";
 
 const API_BASE = "/api";
@@ -174,6 +175,20 @@ export const reports = {
     if (date) params.append("date", date);
     return request(`/reports?${params.toString()}`);
   },
+};
+
+// Budgets API
+export const budgets = {
+  list: (): Promise<CategoryBudget[]> => request("/budgets"),
+
+  set: (category: string, monthly_limit: number): Promise<CategoryBudget> =>
+    request("/budgets", {
+      method: "POST",
+      body: JSON.stringify({ category, monthly_limit }),
+    }),
+
+  delete: (category: string): Promise<{ message: string }> =>
+    request(`/budgets/${category}`, { method: "DELETE" }),
 };
 
 export { ApiError };

@@ -19,11 +19,15 @@ import {
   ArrowLeftRight,
   MoreHorizontal,
 } from "lucide-react";
-import { CURRENCIES, type TransactionCategory } from "../../types";
+import {
+  CURRENCIES,
+  type TransactionCategory,
+  type CategoryReport,
+} from "../../types";
 import { CATEGORY_COLORS } from "./DonutChart";
 
 interface CategoryBreakdownProps {
-  data: Record<string, number>;
+  data: CategoryReport[];
   total: number;
   currency: string;
   selectedCategory: string | null;
@@ -83,15 +87,22 @@ export function CategoryBreakdown({
   const symbol = currencyInfo?.symbol || "$";
 
   // Sort categories by amount descending
-  const sortedCategories = Object.entries(data)
-    .sort((a, b) => b[1] - a[1])
-    .filter(([_, amount]) => amount > 0);
+  const sortedCategories = data
+    .filter((cat) => cat.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
 
   const formatCurrency = (amount: number) => {
     return `${symbol}${amount.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+  };
+
+  const getBudgetColor = (percentage?: number) => {
+    if (!percentage) return undefined;
+    if (percentage > 100) return "#EF4444"; // red
+    if (percentage >= 80) return "#EAB308"; // yellow
+    return "#22C55E"; // green
   };
 
   if (sortedCategories.length === 0) {
@@ -104,7 +115,14 @@ export function CategoryBreakdown({
 
   return (
     <div className="space-y-3">
-      {sortedCategories.map(([category, amount], index) => {
+      {sortedCategories.map((categoryReport, index) => {
+        const {
+          category,
+          amount,
+          budget,
+          percentage: budgetPercentage,
+          remaining,
+        } = categoryReport;
         const percentage = total > 0 ? (amount / total) * 100 : 0;
         const Icon =
           categoryIcons[category as TransactionCategory] || MoreHorizontal;
@@ -146,26 +164,72 @@ export function CategoryBreakdown({
                   <p className="font-medium text-quaternary text-sm">
                     {categoryLabels[category] || category}
                   </p>
-                  <p className="font-semibold text-quaternary text-sm">
-                    {formatCurrency(amount)}
+                  <div className="text-right">
+                    <p className="font-semibold text-quaternary text-sm">
+                      {formatCurrency(amount)}
+                      {budget && (
+                        <span className="text-quaternary/50 font-normal">
+                          {" "}
+                          / {formatCurrency(budget)}
+                        </span>
+                      )}
+                    </p>
+                    {budgetPercentage !== undefined && (
+                      <p
+                        className="text-xs font-medium mt-0.5"
+                        style={{ color: getBudgetColor(budgetPercentage) }}
+                      >
+                        {budgetPercentage.toFixed(0)}% used
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Budget progress bar (if budget exists) */}
+                {budget && budgetPercentage !== undefined ? (
+                  <div className="h-2 bg-border rounded-full overflow-hidden mb-1">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{
+                        backgroundColor: getBudgetColor(budgetPercentage),
+                      }}
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: `${Math.min(budgetPercentage, 100)}%`,
+                      }}
+                      transition={{ duration: 0.5, delay: index * 0.05 + 0.2 }}
+                    />
+                  </div>
+                ) : (
+                  /* Regular progress bar */
+                  <div className="h-2 bg-border rounded-full overflow-hidden mb-1">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: color }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percentage}%` }}
+                      transition={{ duration: 0.5, delay: index * 0.05 + 0.2 }}
+                    />
+                  </div>
+                )}
+
+                {/* Bottom text */}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-quaternary/50">
+                    {percentage.toFixed(1)}% of total expenses
                   </p>
+                  {remaining !== undefined && (
+                    <p
+                      className={`text-xs font-medium ${
+                        remaining >= 0 ? "text-success" : "text-danger"
+                      }`}
+                    >
+                      {remaining >= 0 ? "" : ""}
+                      {formatCurrency(Math.abs(remaining))}{" "}
+                      {remaining >= 0 ? "left" : "over"}
+                    </p>
+                  )}
                 </div>
-
-                {/* Progress bar */}
-                <div className="h-2 bg-border rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ backgroundColor: color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${percentage}%` }}
-                    transition={{ duration: 0.5, delay: index * 0.05 + 0.2 }}
-                  />
-                </div>
-
-                {/* Percentage */}
-                <p className="text-xs text-quaternary/50 mt-1 text-right">
-                  {percentage.toFixed(1)}%
-                </p>
               </div>
             </div>
           </motion.button>

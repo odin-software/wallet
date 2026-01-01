@@ -98,6 +98,18 @@ func migrate(db *sql.DB) error {
 			UNIQUE(base_currency, target_currency)
 		)`,
 
+		// Category budgets table
+		`CREATE TABLE IF NOT EXISTS category_budgets (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			category TEXT NOT NULL CHECK (category IN ('groceries', 'dining', 'transport', 'utilities', 'rent', 'healthcare', 'entertainment', 'shopping', 'subscriptions', 'games', 'travel', 'education', 'fitness', 'personal', 'gifts', 'other')),
+			monthly_limit REAL NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+			UNIQUE(user_id, category)
+		)`,
+
 		// Indexes for performance
 		`CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id)`,
@@ -105,6 +117,7 @@ func migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_exchange_rates_base ON exchange_rates(base_currency)`,
+		`CREATE INDEX IF NOT EXISTS idx_category_budgets_user_id ON category_budgets(user_id)`,
 	}
 
 	for _, migration := range migrations {

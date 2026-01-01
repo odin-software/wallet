@@ -311,7 +311,7 @@ export function Reports() {
             </motion.div>
 
             {/* Expenses Breakdown */}
-            {report && Object.keys(report.expenses_by_category).length > 0 ? (
+            {report && report.expenses_by_category.length > 0 ? (
               <>
                 {/* Donut Chart */}
                 <motion.div

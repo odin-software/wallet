@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
-import { CURRENCIES } from "../../types";
+import { CURRENCIES, type CategoryReport } from "../../types";
 
 interface DonutChartProps {
-  data: Record<string, number>;
+  data: CategoryReport[];
   total: number;
   currency: string;
   selectedCategory: string | null;
@@ -43,7 +43,9 @@ export function DonutChart({
   const symbol = currencyInfo?.symbol || "$";
 
   const segments = useMemo(() => {
-    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    const entries = data
+      .map((cat) => [cat.category, cat.amount] as [string, number])
+      .sort((a, b) => b[1] - a[1]);
     let currentAngle = 0;
     const radius = 80;
     const circumference = 2 * Math.PI * radius;
@@ -158,11 +160,19 @@ export function DonutChart({
                 {selectedCategory.replace("_", " ")}
               </p>
               <p className="text-xl font-bold text-quaternary">
-                {formatCurrency(data[selectedCategory] || 0)}
+                {formatCurrency(
+                  data.find((cat) => cat.category === selectedCategory)
+                    ?.amount || 0
+                )}
               </p>
               <p className="text-xs text-quaternary/50">
                 {total > 0
-                  ? ((data[selectedCategory] / total) * 100).toFixed(1)
+                  ? (
+                      ((data.find((cat) => cat.category === selectedCategory)
+                        ?.amount || 0) /
+                        total) *
+                      100
+                    ).toFixed(1)
                   : 0}
                 %
               </p>

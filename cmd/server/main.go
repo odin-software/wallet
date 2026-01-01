@@ -53,6 +53,7 @@ func main() {
 	transactionHandler := handlers.NewTransactionHandler(db, exchangeService)
 	exchangeHandler := handlers.NewExchangeHandler(exchangeService)
 	reportHandler := handlers.NewReportHandler(db, exchangeService)
+	budgetHandler := handlers.NewBudgetHandler(db)
 
 	// Create router
 	r := chi.NewRouter()
@@ -108,6 +109,11 @@ func main() {
 
 			// Reports
 			r.Get("/reports", reportHandler.GetReport)
+
+			// Budgets
+			r.Get("/budgets", budgetHandler.List)
+			r.Post("/budgets", budgetHandler.Set)
+			r.Delete("/budgets/{category}", budgetHandler.Delete)
 		})
 	})
 

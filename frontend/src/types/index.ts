@@ -156,14 +156,28 @@ export interface ExchangeRates {
 // Reports
 export type ReportPeriod = "month" | "week";
 
+export interface CategoryReport {
+  category: string;
+  amount: number;
+  budget?: number;
+  percentage?: number;
+  remaining?: number;
+}
+
 export interface ReportResponse {
   period_start: string;
   period_end: string;
   currency: string;
   total_income: number;
   total_expenses: number;
-  expenses_by_category: Record<string, number>;
+  expenses_by_category: CategoryReport[];
   first_transaction_date: string | null;
+}
+
+// Budgets
+export interface CategoryBudget {
+  category: TransactionCategory;
+  monthly_limit: number;
 }
 
 // Category metadata
