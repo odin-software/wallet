@@ -82,13 +82,6 @@ body {
   color: var(--color-tertiary);
 }
 
-/* Smooth transitions globally */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
 /* Input base styles */
 input, textarea, select {
   background-color: var(--color-card);
@@ -129,4 +122,56 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* ===========================================
+   Mobile Performance Optimizations
+   =========================================== */
+
+/* Disable blur effects on touch/mobile devices for performance */
+@media (hover: none) and (pointer: coarse) {
+  .mobile-no-blur {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .mobile-no-bg-blur {
+    filter: none !important;
+  }
+
+  /* Disable heavy blur effects globally on mobile */
+  .blur-2xl,
+  .blur-3xl {
+    filter: blur(8px) !important; /* Reduce to lighter blur */
+  }
+}
+
+/* iOS-specific hardware acceleration hints */
+@supports (-webkit-touch-callout: none) {
+  /* Force GPU acceleration for animated elements */
+  [data-animated="true"],
+  .motion-element {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  /* Smooth scrolling for iOS */
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Wallet,
   PieChart,
@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const features = [
   {
@@ -29,36 +30,70 @@ const features = [
 ];
 
 export function Landing() {
+  const prefersReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Detect touch device for performance optimizations
+    const checkMobile = () => {
+      setIsMobile(
+        window.matchMedia("(hover: none) and (pointer: coarse)").matches
+      );
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Disable heavy animations on mobile
+  const shouldAnimate = !prefersReducedMotion && !isMobile;
+
   return (
     <div className="min-h-screen bg-tertiary overflow-hidden">
       {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/5 via-transparent to-transparent rotate-12" />
         <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-secondary/10 via-transparent to-transparent -rotate-12" />
-        {/* Floating shapes */}
+        {/* Floating shapes - static on mobile for performance */}
         <motion.div
-          className="absolute top-1/4 right-1/4 w-64 h-64 rounded-full bg-primary/5 blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          className="absolute top-1/4 right-1/4 w-64 h-64 rounded-full bg-primary/5 blur-3xl mobile-no-bg-blur"
+          animate={
+            shouldAnimate
+              ? {
+                  scale: [1, 1.2, 1],
+                  opacity: [0.3, 0.5, 0.3],
+                }
+              : { scale: 1, opacity: 0.4 }
+          }
+          transition={
+            shouldAnimate
+              ? {
+                  duration: 8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : { duration: 0 }
+          }
         />
         <motion.div
-          className="absolute bottom-1/4 left-1/4 w-96 h-96 rounded-full bg-secondary/5 blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          className="absolute bottom-1/4 left-1/4 w-96 h-96 rounded-full bg-secondary/5 blur-3xl mobile-no-bg-blur"
+          animate={
+            shouldAnimate
+              ? {
+                  scale: [1.2, 1, 1.2],
+                  opacity: [0.2, 0.4, 0.2],
+                }
+              : { scale: 1, opacity: 0.3 }
+          }
+          transition={
+            shouldAnimate
+              ? {
+                  duration: 10,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : { duration: 0 }
+          }
         />
       </div>
 
@@ -95,7 +130,12 @@ export function Landing() {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            transition={{
+              delay: 0.2,
+              type: "tween",
+              duration: 0.25,
+              ease: "easeOut",
+            }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-6"
           >
             <Sparkles className="w-4 h-4" />

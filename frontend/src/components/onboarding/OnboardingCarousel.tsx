@@ -175,9 +175,9 @@ export function OnboardingCarousel({
           >
             {/* Illustration area */}
             <div className="relative mb-12">
-              {/* Background gradient */}
+              {/* Background gradient - reduced blur on mobile for performance */}
               <div
-                className={`absolute inset-0 w-48 h-48 rounded-full bg-gradient-radial ${currentSlide.gradient} blur-2xl scale-150`}
+                className={`absolute inset-0 w-48 h-48 rounded-full bg-gradient-radial ${currentSlide.gradient} blur-2xl mobile-no-bg-blur scale-150`}
               />
 
               {/* Main icon */}

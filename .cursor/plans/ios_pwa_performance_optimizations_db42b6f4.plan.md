@@ -4,22 +4,22 @@ overview: ""
 todos:
   - id: remove-global-transitions
     content: Remove conflicting global * CSS transitions from index.css
-    status: in_progress
+    status: completed
   - id: mobile-blur-utilities
     content: Add CSS utilities to disable blur effects on mobile/touch devices
-    status: pending
+    status: completed
   - id: update-dashboard-header
     content: Update Dashboard header to use conditional blur class
-    status: pending
+    status: completed
   - id: update-landing-blurs
     content: Update Landing page to disable blur and infinite animations on mobile
-    status: pending
+    status: completed
   - id: update-onboarding-blur
     content: Update OnboardingCarousel gradient blur for mobile
-    status: pending
+    status: completed
   - id: ios-optimizations
     content: Add iOS-specific hardware acceleration CSS hints
-    status: pending
+    status: completed
 ---
 
 # iOS PWA Performance Optimizations

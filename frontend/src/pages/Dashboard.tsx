@@ -115,7 +115,7 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-tertiary pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-tertiary/80 backdrop-blur-xl border-b border-border">
+      <header className="sticky top-0 z-40 bg-tertiary/95 backdrop-blur-xl mobile-no-blur border-b border-border">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">
