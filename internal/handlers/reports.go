@@ -18,14 +18,22 @@ func NewReportHandler(db *sql.DB, exchangeService *services.ExchangeService) *Re
 	return &ReportHandler{db: db, exchangeService: exchangeService}
 }
 
+type CategoryReport struct {
+	Category   string   `json:"category"`
+	Amount     float64  `json:"amount"`
+	Budget     *float64 `json:"budget,omitempty"`
+	Percentage *float64 `json:"percentage,omitempty"`
+	Remaining  *float64 `json:"remaining,omitempty"`
+}
+
 type ReportResponse struct {
-	PeriodStart          string             `json:"period_start"`
-	PeriodEnd            string             `json:"period_end"`
-	Currency             string             `json:"currency"`
-	TotalIncome          float64            `json:"total_income"`
-	TotalExpenses        float64            `json:"total_expenses"`
-	ExpensesByCategory   map[string]float64 `json:"expenses_by_category"`
-	FirstTransactionDate *string            `json:"first_transaction_date"`
+	PeriodStart          string           `json:"period_start"`
+	PeriodEnd            string           `json:"period_end"`
+	Currency             string           `json:"currency"`
+	TotalIncome          float64          `json:"total_income"`
+	TotalExpenses        float64          `json:"total_expenses"`
+	ExpensesByCategory   []CategoryReport `json:"expenses_by_category"`
+	FirstTransactionDate *string          `json:"first_transaction_date"`
 }
 
 func (h *ReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +139,7 @@ func (h *ReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
 			Currency:           baseCurrency,
 			TotalIncome:        0,
 			TotalExpenses:      0,
-			ExpensesByCategory: make(map[string]float64),
+			ExpensesByCategory: []CategoryReport{},
 		}, http.StatusOK)
 		return
 	}
@@ -202,13 +210,53 @@ func (h *ReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
 		firstTxDate = &dateStr
 	}
 
+	// Fetch user's budgets (only for monthly reports)
+	budgets := make(map[string]float64)
+	if period == "month" {
+		budgetRows, err := h.db.Query(`
+			SELECT category, monthly_limit
+			FROM category_budgets
+			WHERE user_id = ?
+		`, userID)
+		if err == nil {
+			defer budgetRows.Close()
+			for budgetRows.Next() {
+				var category string
+				var limit float64
+				if err := budgetRows.Scan(&category, &limit); err == nil {
+					budgets[category] = limit
+				}
+			}
+		}
+	}
+
+	// Build category reports with budget information
+	categoryReports := make([]CategoryReport, 0, len(expensesByCategory))
+	for category, amount := range expensesByCategory {
+		catReport := CategoryReport{
+			Category: category,
+			Amount:   amount,
+		}
+
+		// Add budget info if exists for this category
+		if budget, hasBudget := budgets[category]; hasBudget {
+			catReport.Budget = &budget
+			percentage := (amount / budget) * 100
+			catReport.Percentage = &percentage
+			remaining := budget - amount
+			catReport.Remaining = &remaining
+		}
+
+		categoryReports = append(categoryReports, catReport)
+	}
+
 	report := ReportResponse{
 		PeriodStart:          startDate.Format("2006-01-02"),
 		PeriodEnd:            endDate.Format("2006-01-02"),
 		Currency:             baseCurrency,
 		TotalIncome:          totalIncome,
 		TotalExpenses:        totalExpenses,
-		ExpensesByCategory:   expensesByCategory,
+		ExpensesByCategory:   categoryReports,
 		FirstTransactionDate: firstTxDate,
 	}
 

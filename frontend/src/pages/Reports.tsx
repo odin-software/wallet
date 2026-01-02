@@ -122,7 +122,7 @@ export function Reports() {
     };
 
     fetchReport();
-  }, [period, currentDate, getDateParam]);
+  }, [period, currentDate.toISOString()]);
 
   // Currency formatting
   const currencyInfo = CURRENCIES.find((c) => c.code === report?.currency);
@@ -165,7 +165,10 @@ export function Reports() {
             <div className="flex justify-center mb-4">
               <div className="inline-flex bg-tertiary rounded-xl p-1">
                 <button
-                  onClick={() => setPeriod("month")}
+                  onClick={() => {
+                    setPeriod("month");
+                    setCurrentDate(new Date());
+                  }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     period === "month"
                       ? "bg-primary text-tertiary"
@@ -175,7 +178,10 @@ export function Reports() {
                   Monthly
                 </button>
                 <button
-                  onClick={() => setPeriod("week")}
+                  onClick={() => {
+                    setPeriod("week");
+                    setCurrentDate(new Date());
+                  }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     period === "week"
                       ? "bg-primary text-tertiary"
