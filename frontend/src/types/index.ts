@@ -4,6 +4,7 @@ export interface User {
   email: string;
   name?: string;
   preferred_currency: string;
+  onboarding_completed: boolean;
   created_at: string;
 }
 

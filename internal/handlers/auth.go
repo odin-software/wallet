@@ -104,10 +104,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	var name sql.NullString
 	var preferredCurrency sql.NullString
+	var onboardingCompleted sql.NullInt64
 	err := h.db.QueryRow(
-		"SELECT id, email, name, preferred_currency, password_hash, created_at FROM users WHERE email = ?",
+		"SELECT id, email, name, preferred_currency, onboarding_completed, password_hash, created_at FROM users WHERE email = ?",
 		req.Email,
-	).Scan(&user.ID, &user.Email, &name, &preferredCurrency, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Email, &name, &preferredCurrency, &onboardingCompleted, &user.PasswordHash, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		jsonError(w, "Invalid email or password", http.StatusUnauthorized)
@@ -125,6 +126,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if preferredCurrency.Valid {
 		user.PreferredCurrency = preferredCurrency.String
 	}
+	user.OnboardingCompleted = onboardingCompleted.Valid && onboardingCompleted.Int64 == 1
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
@@ -179,13 +181,14 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	var name sql.NullString
 	var preferredCurrency sql.NullString
+	var onboardingCompleted sql.NullInt64
 	var expiresAt time.Time
 	err = h.db.QueryRow(`
-		SELECT u.id, u.email, u.name, u.preferred_currency, u.created_at, s.expires_at
+		SELECT u.id, u.email, u.name, u.preferred_currency, u.onboarding_completed, u.created_at, s.expires_at
 		FROM users u
 		JOIN sessions s ON u.id = s.user_id
 		WHERE s.id = ?
-	`, cookie.Value).Scan(&user.ID, &user.Email, &name, &preferredCurrency, &user.CreatedAt, &expiresAt)
+	`, cookie.Value).Scan(&user.ID, &user.Email, &name, &preferredCurrency, &onboardingCompleted, &user.CreatedAt, &expiresAt)
 
 	if err == sql.ErrNoRows {
 		jsonError(w, "Session not found", http.StatusUnauthorized)
@@ -210,6 +213,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	if preferredCurrency.Valid {
 		user.PreferredCurrency = preferredCurrency.String
 	}
+	user.OnboardingCompleted = onboardingCompleted.Valid && onboardingCompleted.Int64 == 1
 
 	jsonResponse(w, models.AuthResponse{User: &user}, http.StatusOK)
 }
@@ -316,6 +320,44 @@ func (h *AuthHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) 
 		User:    &user,
 		Message: "Preferences updated successfully",
 	}, http.StatusOK)
+}
+
+func (h *AuthHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_id")
+	if err != nil {
+		jsonError(w, "Not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Get user ID from session
+	var userID int64
+	var expiresAt time.Time
+	err = h.db.QueryRow(`
+		SELECT user_id, expires_at FROM sessions WHERE id = ?
+	`, cookie.Value).Scan(&userID, &expiresAt)
+
+	if err == sql.ErrNoRows {
+		jsonError(w, "Session not found", http.StatusUnauthorized)
+		return
+	}
+	if err != nil {
+		jsonError(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	if time.Now().After(expiresAt) {
+		jsonError(w, "Session expired", http.StatusUnauthorized)
+		return
+	}
+
+	// Update onboarding_completed
+	_, err = h.db.Exec("UPDATE users SET onboarding_completed = 1 WHERE id = ?", userID)
+	if err != nil {
+		jsonError(w, "Failed to update onboarding status", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(w, map[string]string{"message": "Onboarding completed"}, http.StatusOK)
 }
 
 func (h *AuthHandler) createSession(userID int64) (string, error) {

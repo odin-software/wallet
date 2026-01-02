@@ -134,6 +134,7 @@ func migrate(db *sql.DB) error {
 	}{
 		{"users", "name", "ALTER TABLE users ADD COLUMN name TEXT"},
 		{"users", "preferred_currency", "ALTER TABLE users ADD COLUMN preferred_currency TEXT DEFAULT 'DOP'"},
+		{"users", "onboarding_completed", "ALTER TABLE users ADD COLUMN onboarding_completed INTEGER DEFAULT 0"},
 		{"transactions", "linked_transaction_id", "ALTER TABLE transactions ADD COLUMN linked_transaction_id INTEGER REFERENCES transactions(id)"},
 	}
 

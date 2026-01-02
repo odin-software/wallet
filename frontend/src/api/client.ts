@@ -77,6 +77,9 @@ export const user = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  completeOnboarding: (): Promise<{ message: string }> =>
+    request("/user/complete-onboarding", { method: "POST" }),
 };
 
 // Accounts API

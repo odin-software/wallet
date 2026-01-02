@@ -79,6 +79,7 @@ func main() {
 
 			// User preferences
 			r.Put("/user/preferences", authHandler.UpdatePreferences)
+			r.Post("/user/complete-onboarding", authHandler.CompleteOnboarding)
 
 			// Account routes
 			r.Route("/accounts", func(r chi.Router) {
